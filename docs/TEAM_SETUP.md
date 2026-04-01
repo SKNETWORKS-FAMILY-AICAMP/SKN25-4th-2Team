@@ -98,7 +98,7 @@ tailscale ping 100.106.29.101
 ## 5. 저장소 가져오기
 
 ```bash
-git clone <repository-url>
+git clone -b dev <repository-url>
 cd Newspedia
 ```
 
