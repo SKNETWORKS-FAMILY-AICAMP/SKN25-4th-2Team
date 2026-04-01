@@ -2,24 +2,32 @@
 
 ## 1. 문서 목적
 
-이 문서는 Newspedia 프로젝트 구성원이 개발 환경을 처음 준비할 때 따라야 하는 절차를 정리한 문서이다. 현재 저장소는 두 가지 실행 모드를 제공한다. 첫째는 대부분의 개발자가 사용하는 `dev` 컨테이너 기반 개발 모드이고, 둘째는 인프라, Airflow, DB, 통합 검증 담당자가 사용하는 서버 스택 모드이다.
+이 문서는 Newspedia 프로젝트 구성원이 개발 환경을 처음 준비할 때 따라야 하는 절차를 정리한 문서이다.
 
-프로젝트 초안 단계에서는 모든 팀원이 동일한 환경 기준으로 작업을 시작해야 한다. 각자 편한 방식으로 실행하기보다, 본 문서의 기준에 맞춰 Docker, `.env`, 개발 컨테이너, 서버 스택을 통일해 두는 편이 좋다.
+서버 스택(MongoDB, PostgreSQL, Airflow)은 팀 공용 서버(encore)에서 운영되고 있으며, 각 팀원은 자신의 컴퓨터에서 `dev` 컨테이너만 띄워 작업한다. 서버 접속은 Tailscale VPN을 통해 이루어진다.
 
-## 2. 준비 사항
+## 2. 전체 흐름
 
-다음 항목이 먼저 준비되어 있어야 한다.
+```
+1. WSL 환경 준비 (Windows 사용자)
+2. Tailscale 설치 (WSL 내부)
+3. 저장소 clone
+4. .env 설정
+5. dev 컨테이너 실행
+6. (선택) Windows 브라우저에서 Airflow/DB 접근 시 포트 포워딩
+```
 
-- 프로젝트 저장소
-- 전달받은 `.env` 파일
-- Docker Desktop 또는 Docker Engine
+## 3. 준비 사항
+
 - Git
-- 선택 사항: Tailscale 또는 팀 공용 서버 접속 수단
+- Docker Desktop 또는 Docker Engine
+- 전달받은 `.env` 파일
+- 전달받은 Tailscale Auth Key
 
 > **용어 안내**
 > - **Docker**는 프로그램 실행에 필요한 환경을 컨테이너 단위로 묶어 동일하게 실행할 수 있게 해 주는 도구이다.
 > - **`.env` 파일**은 API 키, DB 계정, 포트 등 민감한 설정을 모아 두는 파일이다.
-> - **Tailscale**은 팀 공용 서버에 사설 네트워크로 접속할 때 사용할 수 있는 VPN 도구이다. 필수는 아니지만, 팀이 공용 서버를 쓰는 경우 유용하다.
+> - **Tailscale**은 팀 공용 서버에 접속할 때 사용하는 VPN 도구이다.
 
 ### Docker가 설치되어 있지 않은 경우
 
@@ -27,101 +35,106 @@
 - macOS: https://docs.docker.com/desktop/setup/install/mac-install/ 또는 `brew install --cask docker`를 사용한다.
 - Linux: 배포판에 맞는 Docker Engine 설치 절차를 따른다.
 
-설치 후 Docker가 실제로 동작하는지 확인한다.
+설치 후 확인:
 
 ```bash
 docker --version
 docker compose version
 ```
 
-## 3. 저장소 가져오기
+## 4. Tailscale 설치
 
-원하는 작업 폴더에서 저장소를 clone한다.
+개발 컨테이너에서 서버의 DB/Airflow에 접속하려면 Tailscale이 필요하다.
+
+### WSL 사용자 (권장)
+
+WSL 내부에 설치한다. Windows가 아닌 WSL 터미널에서 실행해야 한다.
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+
+설치 후 팀에서 전달받은 Auth Key를 사용하여 접속한다.
+
+```bash
+sudo tailscale up --auth-key=<전달받은 Auth Key>
+```
+
+> Auth Key는 팀 Tailnet에 기기를 등록하기 위한 1회용 키이다. 서버 담당자에게 전달받는다.
+
+설치 확인:
+
+```bash
+tailscale status
+```
+
+아래와 같이 encore 서버가 보이면 정상이다.
+
+```
+100.x.x.x      본인PC   user@  linux  -
+100.106.29.101  encore   user@  linux  active; ...
+```
+
+### macOS 사용자
+
+```bash
+brew install --cask tailscale
+```
+
+Tailscale 앱을 실행한 뒤, 터미널에서 Auth Key로 접속한다.
+
+```bash
+sudo tailscale up --auth-key=<전달받은 Auth Key>
+```
+
+### 연결 확인
+
+```bash
+tailscale ping 100.106.29.101
+```
+
+`pong from encore` 응답이 오면 서버 연결이 정상이다.
+
+## 5. 저장소 가져오기
 
 ```bash
 git clone <repository-url>
 cd Newspedia
 ```
 
-## 4. `.env` 배치
+## 6. `.env` 배치
 
-전달받은 `.env` 파일을 프로젝트 루트에 둔다.
+전달받은 `.env` 파일을 프로젝트 루트에 둔다. 서버 접속 정보, DB 계정 등은 이미 설정되어 있다.
 
-현재 저장소에서 중요도가 높은 항목은 다음과 같다.
+팀원 각자 수정해야 하는 항목:
 
-- `OPENAI_API_KEY`
-- `OPENAI_MODEL`
-- `OPENAI_EMBEDDING_MODEL`
-- `LANGSMITH_API_KEY`
-- `LANGSMITH_PROJECT`
-- `LANGSMITH_WORKSPACE_ID`
-- `POSTGRES_USER`
-- `POSTGRES_PASSWORD`
-- `POSTGRES_DB`
-- `NEWS_POSTGRES_DB`
-- `MONGO_INITDB_ROOT_USERNAME`
-- `MONGO_INITDB_ROOT_PASSWORD`
-- `SERVER_POSTGRES_PORT`
-- `SERVER_MONGO_PORT`
-- `SERVER_AIRFLOW_PORT`
+| 항목 | 설명 |
+|------|------|
+| `LANGSMITH_TRACE_USER` | 본인 이름 (트레이스 구분용) |
 
-공용 서버를 붙여서 쓰는 경우에는 아래 항목도 팀 기준에 맞춰 맞춘다.
-
-- `MONGO_HOST`
-- `POSTGRES_HOST`
-- `AIRFLOW_BASE_URL`
-
-예시는 다음과 같다.
-
-```env
-MONGO_HOST=100.x.x.x
-POSTGRES_HOST=100.x.x.x
-AIRFLOW_BASE_URL=http://100.x.x.x:18080
-```
-
-## 5. 실행 모드 선택
-
-### A. 일반 개발 모드
-
-대부분의 팀원은 이 모드만으로 작업을 시작할 수 있다. UI 개발, 프롬프트 실험, RAG 응답 체인 개발, 코어 로직 작성, 일반 Python 개발은 `dev` 컨테이너만으로 충분하다.
-
-### B. 서버 통합 모드
-
-인프라 담당, Airflow 담당, DB 담당, 통합 테스트 담당은 서버 스택까지 함께 올리는 것이 좋다. 이 모드에서는 MongoDB, PostgreSQL, Airflow API 서버, 스케줄러, DAG 파서까지 함께 확인할 수 있다.
-
-### C. 공용 서버 접속 모드
-
-팀이 중앙 서버를 따로 운영한다면, 로컬에서는 `dev` 컨테이너만 띄우고 MongoDB, PostgreSQL, Airflow는 공용 서버 주소로 붙는 방식도 사용할 수 있다. 이 경우 `.env`의 `MONGO_HOST`, `POSTGRES_HOST`, `AIRFLOW_BASE_URL`를 서버 주소 기준으로 맞춘다.
-
-## 6. 개발 컨테이너 실행
-
-일반 개발 모드에서는 프로젝트 루트에서 아래 명령을 실행한다.
+## 7. dev 컨테이너 실행
 
 ```bash
 bash scripts/setup-dev.sh
 ```
 
-정상 실행 후 확인할 항목은 다음과 같다.
-
-- 컨테이너 이름: `newspedia-dev`
-- Jupyter 주소: `http://127.0.0.1:18888`
-- Streamlit 포트: `18501`
-
-상태 확인 명령은 다음과 같다.
+정상 실행 후 확인:
 
 ```bash
 docker compose -p newspedia_dev ps
 ```
 
-## 7. dev 컨테이너 접속
+- 컨테이너 이름: `newspedia-dev`
+- Jupyter: `http://127.0.0.1:18888`
+- Streamlit 포트: `18501`
 
-아래 명령으로 `dev` 컨테이너에 접속한다.
+### dev 컨테이너 접속
 
 ```bash
 docker compose -p newspedia_dev exec dev bash
 ```
 
-컨테이너 안에서는 다음 작업을 수행할 수 있다.
+컨테이너 안에서 할 수 있는 작업:
 
 - Python 스크립트 실행
 - Jupyter 실험
@@ -129,143 +142,109 @@ docker compose -p newspedia_dev exec dev bash
 - Streamlit 실행
 - 테스트 및 임시 검증
 
-## 8. Streamlit 실행
+### Streamlit 실행
 
-`dev` 컨테이너 안에서 아래 명령을 실행한다.
+dev 컨테이너 안에서:
 
 ```bash
 streamlit run app/main.py --server.address=0.0.0.0
 ```
 
-브라우저에서는 아래 주소로 접속한다.
+브라우저: `http://127.0.0.1:18501`
 
-```text
-http://127.0.0.1:18501
-```
+## 8. Windows 브라우저에서 서버 접근 (선택)
 
-현재 UI는 데모 `IssueDocument`를 사용하므로, UI 담당자는 먼저 검색 영역, 카드 섹션, 문서 상세 흐름을 정리한 뒤 저장 계층과 연결하는 방식으로 작업하면 된다. 수집 담당과 저장 담당은 `src/integrations` 아래에 준비된 역할별 파일 뼈대에서 바로 구현을 시작하면 된다.
+WSL에만 Tailscale이 설치되어 있으므로, Windows 브라우저에서 Airflow 웹 UI 등을 보려면 포트 포워딩이 필요하다.
 
-## 9. 서버 스택 실행
-
-인프라, Airflow, DB, 통합 검증이 필요한 경우에는 아래 명령을 실행한다.
+### 사전 준비: openssh-server 설치 (최초 1회)
 
 ```bash
-bash scripts/setup-server.sh
+sudo apt install openssh-server -y
+sudo service ssh start
 ```
 
-이 명령은 다음 구성을 올린다.
-
-- `newspedia-postgres`
-- `newspedia-mongodb`
-- `newspedia-airflow-init`
-- `newspedia-airflow-web`
-- `newspedia-airflow-scheduler`
-- `newspedia-airflow-dag-processor`
-
-`newspedia-airflow-init`은 초기화 전용 컨테이너이므로, 완료 후 `Exited` 상태가 정상이다. 나머지 컨테이너는 `Up` 상태여야 한다.
-
-상태 확인 명령은 다음과 같다.
+### 포트 포워딩 실행
 
 ```bash
-docker compose -p newspedia_server -f docker-compose.server.yml ps
+bash scripts/port-forward.sh
 ```
 
-## 10. 접속 정보
+WSL 비밀번호를 입력하면 다음 포트가 포워딩된다.
 
-### Jupyter
+| 서비스 | Windows 브라우저 주소 |
+|--------|----------------------|
+| Airflow | `http://127.0.0.1:18080` |
+| PostgreSQL | `127.0.0.1:15432` |
+| MongoDB | `127.0.0.1:17017` |
 
-```text
-http://127.0.0.1:18888
+> `localhost`로 접속이 안 되는 경우 `127.0.0.1`을 사용해 본다.
+
+## 9. 접속 정보 요약
+
+### WSL / dev 컨테이너에서 (코드로 접속)
+
+| 서비스 | 주소 |
+|--------|------|
+| PostgreSQL | `100.106.29.101:15432` |
+| MongoDB | `100.106.29.101:17017` |
+| Airflow API | `http://100.106.29.101:18080` |
+
+### Windows 브라우저 / DB 클라이언트에서 (포트 포워딩 후)
+
+| 서비스 | 주소 |
+|--------|------|
+| Airflow | `http://127.0.0.1:18080` |
+| PostgreSQL | `127.0.0.1:15432` |
+| MongoDB | `127.0.0.1:17017` |
+
+### MongoDB 접속 URI
+
+```
+mongodb://skn25:skn25@100.106.29.101:17017/?authSource=admin
 ```
 
-### Streamlit
+### PostgreSQL 접속 정보
 
-```text
-http://127.0.0.1:18501
+- Host: `100.106.29.101`
+- Port: `15432`
+- User / Password: `.env` 참고
+- Database: `newspedia_meta` 또는 `newspedia_app`
+
+## 10. LangSmith 설정
+
+LangSmith는 별도 컨테이너 없이 Python 실행 환경에서 사용한다. 공용 API 키는 `.env`에 이미 설정되어 있으므로, 각자 `LANGSMITH_TRACE_USER`에 본인 이름만 넣으면 된다.
+
+```env
+LANGSMITH_TRACE_USER=홍길동
 ```
 
-### Airflow
-
-```text
-http://localhost:18080
-```
-
-### MongoDB
-
-GUI 도구를 사용하는 경우 아래 URI를 사용할 수 있다.
-
-```text
-mongodb://<MONGO_INITDB_ROOT_USERNAME>:<MONGO_INITDB_ROOT_PASSWORD>@localhost:17017/?authSource=admin
-```
-
-공용 서버를 사용하는 경우에는 `localhost` 대신 해당 서버 주소를 사용한다.
-
-### PostgreSQL
-
-DBeaver 또는 다른 DB 도구에서 다음 정보를 사용한다.
-
-- Host: `localhost`
-- Port: `.env`의 `SERVER_POSTGRES_PORT`
-- User: `.env`의 `POSTGRES_USER`
-- Password: `.env`의 `POSTGRES_PASSWORD`
-- Database: `.env`의 `POSTGRES_DB`
-
-공용 서버를 사용하는 경우에는 Host를 팀 서버 주소로 바꾼다.
-
-## 11. Tailscale 사용 시 추가 절차
-
-팀이 공용 서버를 Tailscale로 운영하는 경우에만 이 절차를 따른다. 로컬에서 서버 스택을 직접 띄우는 경우에는 이 절을 생략해도 된다.
-
-### WSL 사용자
-
-WSL 사용자는 Windows가 아니라 **WSL 내부에 Tailscale을 설치하고 실행하는 것**을 권장한다.
-
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-tailscale version
-sudo tailscale up
-tailscale status
-tailscale ip -4
-```
-
-### macOS 사용자
-
-macOS에서는 Tailscale 앱 또는 Homebrew를 사용할 수 있다.
-
-```bash
-brew install --cask tailscale
-tailscale status
-tailscale ip -4
-```
-
-연결 후 `.env`의 `MONGO_HOST`, `POSTGRES_HOST`, `AIRFLOW_BASE_URL`를 서버 주소 기준으로 맞춘다.
-
-## 12. LangSmith 사용 방식
-
-LangSmith는 별도 컨테이너 없이 Python 실행 환경에서 사용한다. 개인 API 키를 사용하되, 프로젝트명과 workspace는 팀 공용 기준으로 맞춘다. 이렇게 해야 각자의 로컬 실험 결과를 하나의 프로젝트 안에서 비교할 수 있다.
-
-중요 항목은 다음과 같다.
-
-- `LANGSMITH_API_KEY`
-- `LANGSMITH_PROJECT`
-- `LANGSMITH_WORKSPACE_ID`
-- `LANGSMITH_TRACING`
-
-## 13. 현재 UI와 목표 UI 구분
-
-현재 저장소의 Streamlit UI는 데모 `IssueDocument`를 기반으로 카드와 문서 상세 흐름을 먼저 검증하는 단계이다. `PLAN.md`에 정의된 목표 구조는 다음과 같다.
-
-- 상단 검색창 기반 RAG 질의응답
-- 하단 이슈 카드 탐색
-- 문서 상세 페이지
-- 목차와 네비게이션 트리
-
-따라서 UI 관련 작업을 시작할 때는 "현재 구현된 화면"과 "계획상 목표 화면"을 구분해서 이해하는 것이 중요하다. 현재 구현은 초안이고, 목표 구조는 `PLAN.md`를 기준으로 확장한다.
-
-## 14. 자주 발생하는 문제
+## 11. 자주 발생하는 문제
 
 ### `.env` 파일을 못 읽는 경우
 
 - 프로젝트 루트에 `.env`가 있는지 확인한다.
 - 파일명이 `.env.txt`처럼 바뀌지 않았는지 확인한다.
 - 필요한 값이 비어 있지 않은지 확인한다.
+
+### Tailscale로 서버에 접속이 안 되는 경우
+
+```bash
+tailscale status        # encore가 보이는지 확인
+tailscale ping 100.106.29.101  # 응답이 오는지 확인
+```
+
+- `no reply`: encore 서버의 Tailscale이 꺼져 있거나 네트워크 문제. 서버 담당자에게 확인 요청.
+- status에 encore가 안 보임: 같은 Tailnet에 가입되어 있는지 확인.
+
+### 포트 충돌 (Address already in use)
+
+로컬에서 서버 컨테이너가 띄워져 있으면 포트가 충돌한다. 개발 PC에서는 서버 컨테이너를 띄울 필요가 없다.
+
+```bash
+docker ps  # 서버 컨테이너가 떠있는지 확인
+docker compose -p newspedia_server -f docker-compose.server.yml down  # 서버 컨테이너 내리기
+```
+
+### Windows 브라우저에서 `localhost`로 접속이 안 되는 경우
+
+`localhost` 대신 `127.0.0.1`을 사용한다.
