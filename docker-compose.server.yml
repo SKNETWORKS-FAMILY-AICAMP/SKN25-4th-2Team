@@ -1,0 +1,163 @@
+services:
+  newspedia-postgres:
+    container_name: newspedia-postgres
+    image: newspedia-postgres
+    build:
+      context: .
+      dockerfile: docker/postgres/Dockerfile
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      NEWS_POSTGRES_DB: ${NEWS_POSTGRES_DB}
+    volumes:
+      - newspedia_postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "${SERVER_POSTGRES_PORT:-15432}:5432"
+    restart: unless-stopped
+
+  newspedia-mongo:
+    container_name: newspedia-mongodb
+    image: newspedia-mongo
+    build:
+      context: .
+      dockerfile: docker/mongo/Dockerfile
+    env_file:
+      - .env
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    volumes:
+      - newspedia_mongo_data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet -u ${MONGO_INITDB_ROOT_USERNAME} -p ${MONGO_INITDB_ROOT_PASSWORD} --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep 1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    ports:
+      - "${SERVER_MONGO_PORT:-17017}:27017"
+    restart: unless-stopped
+
+  newspedia-airflow-init:
+    image: newspedia-airflow
+    container_name: newspedia-airflow-init
+    env_file:
+      - .env
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+      AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER: "true"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@newspedia-postgres:5432/${POSTGRES_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+      PYTHONPATH: /opt/airflow:/opt/airflow/src
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: bash -lc "airflow db migrate"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - newspedia_airflow_logs:/opt/airflow/logs
+    depends_on:
+      newspedia-postgres:
+        condition: service_healthy
+      newspedia-mongo:
+        condition: service_healthy
+
+  newspedia-airflow-web:
+    image: newspedia-airflow
+    container_name: newspedia-airflow-web
+    env_file:
+      - .env
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+      AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER: "true"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@newspedia-postgres:5432/${POSTGRES_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+      PYTHONPATH: /opt/airflow:/opt/airflow/src
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: airflow api-server
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - newspedia_airflow_logs:/opt/airflow/logs
+    depends_on:
+      newspedia-airflow-init:
+        condition: service_completed_successfully
+    ports:
+      - "${SERVER_AIRFLOW_PORT:-18080}:8080"
+    restart: unless-stopped
+
+  newspedia-airflow-scheduler:
+    image: newspedia-airflow
+    container_name: newspedia-airflow-scheduler
+    env_file:
+      - .env
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+      AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER: "true"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@newspedia-postgres:5432/${POSTGRES_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+      PYTHONPATH: /opt/airflow:/opt/airflow/src
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: airflow scheduler
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - newspedia_airflow_logs:/opt/airflow/logs
+    depends_on:
+      newspedia-airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  newspedia-airflow-dag-processor:
+    image: newspedia-airflow
+    container_name: newspedia-airflow-dag-processor
+    env_file:
+      - .env
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+      AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER: "true"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@newspedia-postgres:5432/${POSTGRES_DB}
+      AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
+      PYTHONPATH: /opt/airflow:/opt/airflow/src
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: airflow dag-processor
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./src:/opt/airflow/src
+      - newspedia_airflow_logs:/opt/airflow/logs
+    depends_on:
+      newspedia-airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  newspedia_postgres_data:
+  newspedia_mongo_data:
+  newspedia_airflow_logs:

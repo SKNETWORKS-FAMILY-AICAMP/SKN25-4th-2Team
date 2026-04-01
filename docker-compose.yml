@@ -1,0 +1,30 @@
+services:
+  dev:
+    image: newspedia-dev-environment
+    container_name: newspedia-dev
+    build:
+      context: .
+      dockerfile: docker/dev/Dockerfile
+    env_file:
+      - .env
+    environment:
+      APP_RUNTIME_MODE: development
+      PYTHONPATH: /workspace:/workspace/src
+      MONGO_HOST: ${MONGO_HOST}
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      AIRFLOW_BASE_URL: ${AIRFLOW_BASE_URL}
+    working_dir: /workspace
+    ports:
+      - "127.0.0.1:${JUPYTER_PORT:-18888}:8888"
+      - "127.0.0.1:${STREAMLIT_PORT:-18501}:8501"
+    command: >
+      bash -lc "jupyter lab
+      --ip=0.0.0.0
+      --port=8888
+      --no-browser
+      --allow-root
+      --IdentityProvider.token='${JUPYTER_TOKEN:-dev}'"
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/workspace
