@@ -10,7 +10,7 @@ class AppSettings(BaseSettings):
 
     app_runtime_mode: str = Field(default="development", alias="APP_RUNTIME_MODE")
     langsmith_api_key: Optional[str] = Field(default=None, alias="LANGSMITH_API_KEY")
-    langsmith_project: str = Field(default="Newspedia", alias="LANGSMITH_PROJECT")
+    langsmith_project: str = Field(default="ArXplore", alias="LANGSMITH_PROJECT")
     langsmith_workspace_id: Optional[str] = Field(default=None, alias="LANGSMITH_WORKSPACE_ID")
     langsmith_tracing: bool = Field(default=True, alias="LANGSMITH_TRACING")
     langsmith_trace_user: Optional[str] = Field(default=None, alias="LANGSMITH_TRACE_USER")

@@ -13,7 +13,7 @@ def build_analysis_trace_config(
         stage="analyze",
         runtime=runtime,
         user=user,
-        extra_tags=["llm", "summary", "issue-analysis"],
+        extra_tags=["llm", "summary", "topic-analysis"],
         extra_metadata=extra_metadata,
     )
     return context.as_langchain_config()

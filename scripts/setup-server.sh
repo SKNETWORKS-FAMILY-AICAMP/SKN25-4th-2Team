@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_NAME="newspedia_server"
+PROJECT_NAME="arxplore_server"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
@@ -12,7 +12,7 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-docker build -t newspedia-airflow -f docker/airflow/Dockerfile .
+docker build -t arxplore-airflow -f docker/airflow/Dockerfile .
 docker compose -p "${PROJECT_NAME}" -f docker-compose.server.yml up -d --build
 
 echo

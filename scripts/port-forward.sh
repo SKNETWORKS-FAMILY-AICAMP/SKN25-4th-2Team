@@ -11,7 +11,7 @@ AIRFLOW_PORT="${SERVER_AIRFLOW_PORT:-18080}"
 POSTGRES_PORT="${SERVER_POSTGRES_PORT:-15432}"
 MONGO_PORT="${SERVER_MONGO_PORT:-17017}"
 
-echo "[port-forward] encore 서버(${SERVER_IP})로 포트 포워딩"
+echo "[port-forward] ArXplore 서버(${SERVER_IP})로 포트 포워딩"
 echo "  Airflow:    localhost:${AIRFLOW_PORT}"
 echo "  PostgreSQL: localhost:${POSTGRES_PORT}"
 echo "  MongoDB:    localhost:${MONGO_PORT}"

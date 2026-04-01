@@ -1,7 +1,7 @@
 services:
-  newspedia-postgres:
-    container_name: newspedia-postgres
-    image: newspedia-postgres
+  arxplore-postgres:
+    container_name: arxplore-postgres
+    image: arxplore-postgres
     build:
       context: .
       dockerfile: docker/postgres/Dockerfile
@@ -11,9 +11,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      NEWS_POSTGRES_DB: ${NEWS_POSTGRES_DB}
+      APP_POSTGRES_DB: ${APP_POSTGRES_DB}
     volumes:
-      - newspedia_postgres_data:/var/lib/postgresql/data
+      - arxplore_postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -24,9 +24,9 @@ services:
       - "${SERVER_POSTGRES_PORT:-15432}:5432"
     restart: unless-stopped
 
-  newspedia-mongo:
-    container_name: newspedia-mongodb
-    image: newspedia-mongo
+  arxplore-mongo:
+    container_name: arxplore-mongodb
+    image: arxplore-mongo
     build:
       context: .
       dockerfile: docker/mongo/Dockerfile
@@ -36,7 +36,7 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     volumes:
-      - newspedia_mongo_data:/data/db
+      - arxplore_mongo_data:/data/db
     healthcheck:
       test:
         [
@@ -50,9 +50,9 @@ services:
       - "${SERVER_MONGO_PORT:-17017}:27017"
     restart: unless-stopped
 
-  newspedia-airflow-init:
-    image: newspedia-airflow
-    container_name: newspedia-airflow-init
+  arxplore-airflow-init:
+    image: arxplore-airflow
+    container_name: arxplore-airflow-init
     env_file:
       - .env
     environment:
@@ -62,7 +62,7 @@ services:
       AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
       AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER: "true"
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@newspedia-postgres:5432/${POSTGRES_DB}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@arxplore-postgres:5432/${POSTGRES_DB}
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
       PYTHONPATH: /opt/airflow:/opt/airflow/src
     user: "${AIRFLOW_UID:-50000}:0"
@@ -70,16 +70,16 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./src:/opt/airflow/src
-      - newspedia_airflow_logs:/opt/airflow/logs
+      - arxplore_airflow_logs:/opt/airflow/logs
     depends_on:
-      newspedia-postgres:
+      arxplore-postgres:
         condition: service_healthy
-      newspedia-mongo:
+      arxplore-mongo:
         condition: service_healthy
 
-  newspedia-airflow-web:
-    image: newspedia-airflow
-    container_name: newspedia-airflow-web
+  arxplore-airflow-web:
+    image: arxplore-airflow
+    container_name: arxplore-airflow-web
     env_file:
       - .env
     environment:
@@ -89,7 +89,7 @@ services:
       AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
       AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER: "true"
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@newspedia-postgres:5432/${POSTGRES_DB}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@arxplore-postgres:5432/${POSTGRES_DB}
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
       PYTHONPATH: /opt/airflow:/opt/airflow/src
     user: "${AIRFLOW_UID:-50000}:0"
@@ -97,17 +97,17 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./src:/opt/airflow/src
-      - newspedia_airflow_logs:/opt/airflow/logs
+      - arxplore_airflow_logs:/opt/airflow/logs
     depends_on:
-      newspedia-airflow-init:
+      arxplore-airflow-init:
         condition: service_completed_successfully
     ports:
       - "${SERVER_AIRFLOW_PORT:-18080}:8080"
     restart: unless-stopped
 
-  newspedia-airflow-scheduler:
-    image: newspedia-airflow
-    container_name: newspedia-airflow-scheduler
+  arxplore-airflow-scheduler:
+    image: arxplore-airflow
+    container_name: arxplore-airflow-scheduler
     env_file:
       - .env
     environment:
@@ -117,7 +117,7 @@ services:
       AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
       AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER: "true"
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@newspedia-postgres:5432/${POSTGRES_DB}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@arxplore-postgres:5432/${POSTGRES_DB}
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
       PYTHONPATH: /opt/airflow:/opt/airflow/src
     user: "${AIRFLOW_UID:-50000}:0"
@@ -125,15 +125,15 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./src:/opt/airflow/src
-      - newspedia_airflow_logs:/opt/airflow/logs
+      - arxplore_airflow_logs:/opt/airflow/logs
     depends_on:
-      newspedia-airflow-init:
+      arxplore-airflow-init:
         condition: service_completed_successfully
     restart: unless-stopped
 
-  newspedia-airflow-dag-processor:
-    image: newspedia-airflow
-    container_name: newspedia-airflow-dag-processor
+  arxplore-airflow-dag-processor:
+    image: arxplore-airflow
+    container_name: arxplore-airflow-dag-processor
     env_file:
       - .env
     environment:
@@ -143,7 +143,7 @@ services:
       AIRFLOW__CORE__AUTH_MANAGER: airflow.api_fastapi.auth.managers.simple.simple_auth_manager.SimpleAuthManager
       AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
       AIRFLOW__CORE__EXECUTE_TASKS_NEW_PYTHON_INTERPRETER: "true"
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@newspedia-postgres:5432/${POSTGRES_DB}
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@arxplore-postgres:5432/${POSTGRES_DB}
       AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY:-}
       PYTHONPATH: /opt/airflow:/opt/airflow/src
     user: "${AIRFLOW_UID:-50000}:0"
@@ -151,13 +151,13 @@ services:
     volumes:
       - ./dags:/opt/airflow/dags
       - ./src:/opt/airflow/src
-      - newspedia_airflow_logs:/opt/airflow/logs
+      - arxplore_airflow_logs:/opt/airflow/logs
     depends_on:
-      newspedia-airflow-init:
+      arxplore-airflow-init:
         condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
-  newspedia_postgres_data:
-  newspedia_mongo_data:
-  newspedia_airflow_logs:
+  arxplore_postgres_data:
+  arxplore_mongo_data:
+  arxplore_airflow_logs:

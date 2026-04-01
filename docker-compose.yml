@@ -1,7 +1,7 @@
 services:
   dev:
-    image: newspedia-dev-environment
-    container_name: newspedia-dev
+    image: arxplore-dev-environment
+    container_name: arxplore-dev
     build:
       context: .
       dockerfile: docker/dev/Dockerfile

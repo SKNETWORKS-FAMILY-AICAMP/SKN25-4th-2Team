@@ -4,71 +4,85 @@ from datetime import datetime
 
 import streamlit as st
 
-from app.components.issue_card import render_issue_card
-from app.pages.issue_detail import render_issue_detail
-from src.core import IssueDocument, RelatedIssue, SourceRef
+from app.components.topic_card import render_topic_card
+from app.pages.topic_detail import render_topic_detail
+from src.core import PaperRef, RelatedTopic, TopicDocument
 
-st.set_page_config(page_title="Newspedia", layout="wide")
+st.set_page_config(page_title="ArXplore", layout="wide")
 
 
-def _load_demo_issues() -> list[IssueDocument]:
+def _load_demo_topics() -> list[TopicDocument]:
     return [
-        IssueDocument(
-            issue_id=1,
-            title="국내 AI 반도체 스타트업, 신규 추론 칩 공개",
+        TopicDocument(
+            topic_id=1,
+            title="Speculative Decoding 최적화와 추론 효율화",
             overview=(
-                "국내 AI 반도체 스타트업이 신규 추론 칩을 공개하며 데이터센터와 온디바이스 "
-                "시장 동시 진입 전략을 내놨다. 발표 기사들은 성능 수치와 고객사 확보 여부를 "
-                "집중적으로 다뤘고, 업계 반응은 국산 대체재 가능성에 주목했다."
+                "최근 AI 추론 효율화 연구는 speculative decoding의 draft model 품질과 "
+                "verification 전략을 세분화하는 방향으로 움직이고 있다. 이 토픽의 논문들은 "
+                "범용 draft 하나로 모든 작업을 처리하기보다, 작업 특화 draft와 inference-time "
+                "routing을 조합하는 접근이 더 강하다는 점을 공통적으로 보여준다."
             ),
-            background=(
-                "생성형 AI 서비스 확산으로 추론 전용 칩 수요가 빠르게 증가하고 있다. "
-                "[일반 배경 정보] GPU 중심 시장에서 전력 효율과 가격 경쟁력을 앞세운 "
-                "전용 반도체 수요가 커지고 있다."
-            ),
-            key_facts=[
-                "회사는 신규 추론 칩의 정식 제품명을 공개했다.",
-                "양산 시점과 초기 고객사 확보 계획이 기사 전반에서 공통으로 언급됐다.",
-                "전력 효율 개선 수치가 여러 기사에서 핵심 근거로 제시됐다.",
+            key_findings=[
+                "추론 가속 품질은 draft 모델 구조뿐 아니라 학습 데이터와 다운스트림 작업의 정합성에 크게 좌우된다.",
+                "단일 범용 draft보다 작업 특화 draft를 inference 단계에서 라우팅하는 구성이 더 안정적인 향상을 보인다.",
+                "성능 평가는 MT-Bench, GSM8K, MATH-500 같은 벤치마크 조합에 따라 차이가 크므로 토픽 단위 비교가 중요하다.",
             ],
-            source_articles=[
-                SourceRef(
-                    article_id=101,
-                    title="AI 반도체 스타트업, 추론 칩 공개",
-                    publisher="테크데일리",
-                    url="https://example.com/article-101",
-                    published_at=datetime(2026, 3, 31, 9, 0),
+            papers=[
+                PaperRef(
+                    arxiv_id="2603.27027",
+                    title="TAPS: Task Aware Proposal Distributions for Speculative Sampling",
+                    authors=[
+                        "Mohamad Zbib",
+                        "Mohamad Bazzi",
+                        "Ammar Mohanna",
+                        "Hasan Abed Al Kader Hammoud",
+                        "Bernard Ghanem",
+                    ],
+                    abstract=(
+                        "Speculative decoding quality depends on draft-model training distribution and "
+                        "improves when specialized drafters are combined with confidence-based routing."
+                    ),
+                    pdf_url="https://arxiv.org/pdf/2603.27027v1",
+                    published_at=datetime(2026, 3, 27, 22, 34),
+                    upvotes=127,
+                    github_url="https://github.com/Moe-Zbeeb/TAPS",
+                    github_stars=4,
                 ),
-                SourceRef(
-                    article_id=102,
-                    title="국산 추론 칩 시장 진입 본격화",
-                    publisher="IT뉴스",
-                    url="https://example.com/article-102",
-                    published_at=datetime(2026, 3, 31, 10, 30),
+                PaperRef(
+                    arxiv_id="2604.00042",
+                    title="Adaptive Verification for Efficient Large-Scale Decoding",
+                    authors=["ArXplore Demo Author"],
+                    abstract=(
+                        "A demo paper showing how adaptive verification policies can reduce target-model "
+                        "workload under heterogeneous task mixes."
+                    ),
+                    pdf_url="https://arxiv.org/pdf/2604.00042v1",
+                    published_at=datetime(2026, 4, 1, 9, 0),
+                    upvotes=18,
                 ),
             ],
-            related_issues=[
-                RelatedIssue(issue_id=2, title="클라우드 사업자, AI 인프라 투자 확대"),
-                RelatedIssue(issue_id=3, title="국내 반도체 설계 인력 확보 경쟁 심화"),
+            related_topics=[
+                RelatedTopic(topic_id=2, title="Inference-Time Routing과 MoE 추론 최적화"),
+                RelatedTopic(topic_id=3, title="Reasoning 벤치마크 중심 draft model 평가"),
             ],
-            generated_at=datetime(2026, 3, 31, 12, 0),
+            generated_at=datetime(2026, 4, 1, 12, 0),
         )
     ]
 
 
-issues = _load_demo_issues()
+topics = _load_demo_topics()
 
-st.title("Newspedia")
-st.caption("최근 이슈를 문서 단위로 읽고, 근거 기사와 함께 맥락을 빠르게 파악하는 베타 UI")
+st.title("ArXplore")
+st.caption("HF Daily Papers와 arXiv 기반 최신 AI 논문을 토픽 문서와 함께 읽는 베타 UI")
 
-issue_map = {issue.title: issue for issue in issues}
-selected_title = st.sidebar.selectbox("이슈 선택", list(issue_map.keys()))
-selected_issue = issue_map[selected_title]
+topic_map = {topic.title: topic for topic in topics}
+selected_title = st.sidebar.selectbox("토픽 선택", list(topic_map.keys()))
+selected_topic = topic_map[selected_title]
 
-st.markdown("## 이슈 카드")
-for issue in issues:
+st.markdown("## 토픽 카드")
+for topic in topics:
     with st.container(border=True):
-        render_issue_card(issue)
+        render_topic_card(topic)
 
 st.divider()
-render_issue_detail(selected_issue)
+render_topic_detail(selected_topic)
