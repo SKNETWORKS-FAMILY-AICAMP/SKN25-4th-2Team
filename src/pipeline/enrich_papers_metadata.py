@@ -31,6 +31,43 @@ def _merge_existing_and_enriched(existing: dict[str, Any], enriched: dict[str, A
     }
 
 
+def _build_soft_fail_result(
+    *,
+    status: str,
+    runtime: str,
+    user: Optional[str],
+    candidates: list[dict[str, Any]],
+    normalized_limit: int,
+    error_message: str,
+) -> dict[str, Any]:
+    trace_config = build_pipeline_trace_config(
+        stage="enrich_papers_metadata",
+        runtime=runtime,
+        user=user,
+        extra_metadata={
+            "candidate_count": len(candidates),
+            "updated_count": 0,
+            "skipped_count": 0,
+            "max_papers": normalized_limit,
+            "soft_failed": True,
+            "soft_fail_status": status,
+        },
+    )
+
+    return {
+        "stage": "enrich_papers_metadata",
+        "status": status,
+        "candidate_count": len(candidates),
+        "updated_count": 0,
+        "skipped_count": 0,
+        "max_papers": normalized_limit,
+        "sample_updated": [],
+        "failed_arxiv_ids": [paper["arxiv_id"] for paper in candidates[:5] if paper.get("arxiv_id")],
+        "error": error_message,
+        "trace_config": trace_config,
+    }
+
+
 def run_enrich_papers_metadata(
     *,
     runtime: str = "airflow",
@@ -53,31 +90,23 @@ def run_enrich_papers_metadata(
         status_code = getattr(getattr(exc, "response", None), "status_code", None)
         if status_code != 429:
             raise
-
-        trace_config = build_pipeline_trace_config(
-            stage="enrich_papers_metadata",
+        return _build_soft_fail_result(
+            status="rate_limited",
             runtime=runtime,
             user=user,
-            extra_metadata={
-                "candidate_count": len(candidates),
-                "updated_count": 0,
-                "skipped_count": 0,
-                "max_papers": normalized_limit,
-                "rate_limited": True,
-            },
+            candidates=candidates,
+            normalized_limit=normalized_limit,
+            error_message=str(exc),
         )
-
-        return {
-            "stage": "enrich_papers_metadata",
-            "status": "rate_limited",
-            "candidate_count": len(candidates),
-            "updated_count": 0,
-            "skipped_count": 0,
-            "max_papers": normalized_limit,
-            "sample_updated": [],
-            "failed_arxiv_ids": arxiv_ids[:5],
-            "trace_config": trace_config,
-        }
+    except requests.Timeout as exc:
+        return _build_soft_fail_result(
+            status="timed_out",
+            runtime=runtime,
+            user=user,
+            candidates=candidates,
+            normalized_limit=normalized_limit,
+            error_message=str(exc),
+        )
 
     updated_count = 0
     skipped_count = 0

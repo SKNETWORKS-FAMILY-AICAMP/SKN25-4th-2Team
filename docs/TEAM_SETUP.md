@@ -180,6 +180,8 @@ WSL에만 Tailscale이 설치되어 있으므로, Windows 브라우저에서 Air
 
 ### 사전 준비
 
+`bash scripts/port-forward.sh`는 내부적으로 `ssh localhost`를 사용한다. 따라서 아래 두 줄을 먼저 실행해 로컬 SSH 서버를 켜지 않으면 `connect to host localhost port 22: Connection refused` 오류가 난다.
+
 ```bash
 sudo apt install openssh-server -y
 sudo service ssh start
@@ -187,7 +189,15 @@ sudo service ssh start
 
 ### 포트 포워딩 실행
 
+순서는 반드시 아래와 같이 진행한다.
+
+1. `openssh-server` 설치
+2. `ssh` 서비스 시작
+3. `bash scripts/port-forward.sh` 실행
+
 ```bash
+sudo apt install openssh-server -y
+sudo service ssh start
 bash scripts/port-forward.sh
 ```
 
@@ -207,7 +217,9 @@ mongodb://<MONGO_INITDB_ROOT_USERNAME>:<MONGO_INITDB_ROOT_PASSWORD>@127.0.0.1:17
 
 연결이 되지 않으면 먼저 다음 상태를 다시 확인한다.
 
+- `sudo apt install openssh-server -y`를 한 번도 하지 않았는지
 - WSL에서 `sudo service ssh start`가 실행 중인지
+- `ssh localhost`가 정상 응답하는지
 - `bash scripts/port-forward.sh`가 종료되지 않고 유지되고 있는지
 - Compass에서 `127.0.0.1:17017`와 `authSource=admin`을 사용하고 있는지
 

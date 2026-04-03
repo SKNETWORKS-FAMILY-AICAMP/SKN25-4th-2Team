@@ -16,7 +16,7 @@ class AppSettings(BaseSettings):
     hf_request_timeout_seconds: int = Field(default=20, alias="HF_REQUEST_TIMEOUT_SECONDS")
 
     arxiv_api_base_url: str = Field(default="https://export.arxiv.org/api/query", alias="ARXIV_API_BASE_URL")
-    arxiv_request_timeout_seconds: int = Field(default=20, alias="ARXIV_REQUEST_TIMEOUT_SECONDS")
+    arxiv_request_timeout_seconds: int = Field(default=45, alias="ARXIV_REQUEST_TIMEOUT_SECONDS")
     arxiv_request_batch_size: int = Field(default=25, alias="ARXIV_REQUEST_BATCH_SIZE")
     arxiv_request_delay_seconds: float = Field(default=3.0, alias="ARXIV_REQUEST_DELAY_SECONDS")
     layout_parser_base_url: Optional[str] = Field(default=None, alias="LAYOUT_PARSER_BASE_URL")

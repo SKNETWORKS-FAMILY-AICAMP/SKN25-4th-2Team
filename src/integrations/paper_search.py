@@ -64,8 +64,8 @@ class PaperSearchClient:
                 self.settings.arxiv_api_base_url,
                 params=params,
                 timeout=self.settings.arxiv_request_timeout_seconds,
-                retry_count=3,
-                retry_delay_seconds=max(1.0, float(self.settings.arxiv_request_delay_seconds)),
+                retry_count=4,
+                retry_delay_seconds=max(2.0, float(self.settings.arxiv_request_delay_seconds)),
             )
             results.update(self._parse_arxiv_feed(response.text))
 
@@ -99,7 +99,10 @@ class PaperSearchClient:
                 if attempt >= retry_count:
                     break
                 status_code = getattr(getattr(exc, "response", None), "status_code", None)
-                multiplier = 5 if status_code == 429 else 1
+                if isinstance(exc, requests.Timeout):
+                    multiplier = 2
+                else:
+                    multiplier = 5 if status_code == 429 else 1
                 time.sleep(retry_delay_seconds * attempt * multiplier)
         if last_error is None:
             raise RuntimeError("HTTP 요청 재시도 중 알 수 없는 오류가 발생했습니다.")
