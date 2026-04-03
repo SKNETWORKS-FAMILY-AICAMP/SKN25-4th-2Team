@@ -56,7 +56,7 @@ class VectorRepository:
                 "chunk_id": row[0],
                 "arxiv_id": row[1],
                 "chunk_index": row[2],
-                "chunk_text": row[3] or "",
+                "chunk_text": self._sanitize_text(row[3] or ""),
                 "section_title": row[4],
                 "metadata": row[5] or {},
                 "paper_title": row[6] or "",
@@ -170,3 +170,7 @@ class VectorRepository:
     @staticmethod
     def _vector_literal(values: Sequence[float]) -> str:
         return "[" + ",".join(f"{float(value):.12f}" for value in values) + "]"
+
+    @staticmethod
+    def _sanitize_text(value: str) -> str:
+        return "".join(char for char in value if not 0xD800 <= ord(char) <= 0xDFFF)

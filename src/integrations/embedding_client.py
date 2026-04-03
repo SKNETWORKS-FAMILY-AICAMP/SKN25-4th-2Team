@@ -30,7 +30,7 @@ class EmbeddingClient:
 
     def embed_texts(self, texts: Sequence[str]) -> list[list[float]]:
         """텍스트 목록을 벡터 목록으로 변환한다."""
-        normalized_texts = [str(text or "").strip() for text in texts]
+        normalized_texts = [self._sanitize_text(str(text or "").strip()) for text in texts]
         if not normalized_texts:
             return []
 
@@ -50,6 +50,10 @@ class EmbeddingClient:
             embeddings.extend([list(item.embedding) for item in response.data])
 
         return embeddings
+
+    @staticmethod
+    def _sanitize_text(value: str) -> str:
+        return "".join(char for char in value if not 0xD800 <= ord(char) <= 0xDFFF)
 
     def _get_client(self) -> OpenAI:
         if self._client is not None:
