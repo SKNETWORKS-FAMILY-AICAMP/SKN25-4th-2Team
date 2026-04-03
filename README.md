@@ -41,7 +41,7 @@ flowchart TD
 
 ```bash
 bash scripts/setup-dev.sh
-docker compose -p arxplore_dev exec dev bash
+docker compose -p arxplore_dev -f docker-compose.dev.yml exec dev bash
 streamlit run app/main.py --server.address=0.0.0.0
 ```
 

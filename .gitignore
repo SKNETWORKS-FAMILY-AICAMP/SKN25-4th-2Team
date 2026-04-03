@@ -20,8 +20,6 @@ data/postgres/
 .DS_Store
 Thumbs.db
 
-# Local parser verification helpers
-scripts/check_parser.py
-scripts/compare_parsers.py
 tests/
 prepare_*.log
+.port-forward.pid

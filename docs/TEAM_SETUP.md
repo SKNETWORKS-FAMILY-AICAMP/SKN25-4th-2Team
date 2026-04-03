@@ -81,7 +81,7 @@ cd ArXplore
 `.env`를 수정한 뒤에는 `docker compose restart`만으로 값이 다시 주입되지 않을 수 있다. 환경 변수 변경을 반영해야 할 때는 기존 컨테이너를 재시작하는 대신 아래처럼 재생성한다.
 
 ```bash
-docker compose -p arxplore_dev up -d --force-recreate dev
+docker compose -p arxplore_dev -f docker-compose.dev.yml up -d --force-recreate dev
 ```
 
 주요 값은 다음과 같다.
@@ -113,7 +113,7 @@ bash scripts/setup-dev.sh
 정상 실행 후 확인:
 
 ```bash
-docker compose -p arxplore_dev ps
+docker compose -p arxplore_dev -f docker-compose.dev.yml ps
 ```
 
 - 컨테이너 이름: `arxplore-dev`
@@ -123,7 +123,7 @@ docker compose -p arxplore_dev ps
 ### dev 컨테이너 접속
 
 ```bash
-docker compose -p arxplore_dev exec dev bash
+docker compose -p arxplore_dev -f docker-compose.dev.yml exec dev bash
 ```
 
 컨테이너 안에서 할 수 있는 작업:
@@ -165,13 +165,13 @@ docker logs -f arxplore-layout-parser
 로컬 GPU에서 prepare를 실행할 때는 아래 워커 스크립트를 사용한다.
 
 ```bash
-docker compose -p arxplore_dev exec dev bash -lc 'cd /workspace && python3 scripts/run_prepare_worker.py --mode auto --loop --sleep-seconds 120'
+docker compose -p arxplore_dev -f docker-compose.dev.yml exec dev bash -lc 'cd /workspace && python3 -m src.pipeline.prepare_worker --mode auto --max-jobs-per-run 1 --loop --sleep-seconds 120'
 ```
 
 과거 raw를 파싱해 적재할 때만 backfill 모드를 수동으로 사용한다.
 
 ```bash
-docker compose -p arxplore_dev exec dev bash -lc 'cd /workspace && python3 scripts/run_prepare_worker.py --mode backfill --batch-days 3 --loop --sleep-seconds 120'
+docker compose -p arxplore_dev -f docker-compose.dev.yml exec dev bash -lc 'cd /workspace && python3 -m src.pipeline.prepare_worker --mode backfill --batch-days 3 --loop --sleep-seconds 120'
 ```
 
 ## 9. 서버 스택 실행

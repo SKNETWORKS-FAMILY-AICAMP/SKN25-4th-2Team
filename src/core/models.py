@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """ArXplore 공용 문서 계약 모델.
 
 이 파일의 모델은 UI, pipeline, 저장 계층, LLM 체인이 함께 의존하는 공용 계약입니다.
@@ -13,6 +11,8 @@ from __future__ import annotations
 5. docs/WORKFLOW.md
 6. app/, src/pipeline/, 저장 계층 코드
 """
+
+from __future__ import annotations
 
 from datetime import datetime
 

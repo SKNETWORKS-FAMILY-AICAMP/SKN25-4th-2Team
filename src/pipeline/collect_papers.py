@@ -16,6 +16,7 @@ def run_collect_papers(
     runtime: str = "airflow",
     user: Optional[str] = None,
     target_date: str | None = None,
+    enqueue_prepare: bool = True,
 ) -> dict[str, Any]:
     """HF Daily Papers를 수집하고 MongoDB에 원본을 저장한다."""
     normalized_target_date = (target_date or "").strip() or None
@@ -28,6 +29,11 @@ def run_collect_papers(
 
     payload = search_client.fetch_daily_papers(normalized_date)
     record_id = raw_store.save_daily_papers_response(date=normalized_date, payload=payload)
+    queue_result = (
+        raw_store.enqueue_prepare_job(date=normalized_date, mode="auto", source="collect")
+        if enqueue_prepare
+        else {"enqueued": False, "job_id": None}
+    )
 
     sample_arxiv_ids = [
         paper.get("paper", {}).get("id")
@@ -43,6 +49,7 @@ def run_collect_papers(
             "target_date": normalized_date,
             "fetched_count": len(payload),
             "stored_record_id": record_id,
+            "prepare_queue_enqueued": bool(queue_result.get("enqueued")),
         },
     )
 
@@ -52,6 +59,8 @@ def run_collect_papers(
         "target_date": normalized_date,
         "fetched_count": len(payload),
         "stored_record_id": record_id,
+        "prepare_queue_enqueued": bool(queue_result.get("enqueued")),
+        "prepare_job_id": queue_result.get("job_id"),
         "sample_arxiv_ids": sample_arxiv_ids,
         "trace_config": trace_config,
     }
@@ -143,6 +152,7 @@ def run_backfill_collect_papers(
                 runtime=runtime,
                 user=user,
                 target_date=target_str,
+                enqueue_prepare=False,
             )
         except Exception as exc:
             failures.append({"date": target_str, "error": str(exc)})

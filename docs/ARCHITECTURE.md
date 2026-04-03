@@ -50,7 +50,7 @@ ArXplore는 표와 그림 중심 분석보다 텍스트 기반 탐색 경험을 
 
 ### 개발 환경
 
-개발 환경은 `docker-compose.yml`을 기준으로 동작하며, 단일 `dev` 컨테이너를 제공한다. 이 컨테이너는 Jupyter, Python 실행, Streamlit 수동 실행을 담당한다.
+개발 환경은 `docker-compose.dev.yml`을 기준으로 동작하며, 단일 `dev` 컨테이너를 제공한다. 이 컨테이너는 Jupyter, Python 실행, Streamlit 수동 실행을 담당한다.
 
 ```mermaid
 flowchart LR

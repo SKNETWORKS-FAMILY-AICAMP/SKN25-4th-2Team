@@ -111,7 +111,7 @@ ArXplore에서는 다음 용어를 공통으로 사용한다.
 
 **Docker · Compose · 스크립트**
 
-- `docker-compose.yml`
+- `docker-compose.dev.yml`
 - `docker-compose.server.yml`
 - `docker-compose.parser.yml`
 - `docker/airflow/Dockerfile`
@@ -123,16 +123,11 @@ ArXplore에서는 다음 용어를 공통으로 사용한다.
 - `scripts/setup-dev.sh`
 - `scripts/setup-server.sh`
 - `scripts/port-forward.sh`
-- `scripts/reset_refined_postgres.py`
 
 **Airflow DAG 정의**
 
-- `dags/collect_papers.py`
-- `dags/backfill_collect_papers.py`
-- `dags/enrich_papers_metadata.py`
-- `dags/prepare_papers.py`
-- `dags/embed_papers.py`
-- `dags/analyze_topics.py`
+- `dags/ingestion.py`
+- `dags/processing.py`
 
 **파이프라인 진입점**
 

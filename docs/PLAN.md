@@ -393,7 +393,7 @@ ArXplore는 5인 병렬 개발을 전제로 한다.
 
 ## 16. 검증 체크리스트
 
-- `docker compose -p arxplore_dev up`
+- `docker compose -p arxplore_dev -f docker-compose.dev.yml up`
 - `docker compose -p arxplore_server -f docker-compose.server.yml up`
 - `docker compose -f docker-compose.parser.yml up -d --build`
 - `python3 -c "from src.core import TopicDocument, PaperRef, RelatedTopic"`
