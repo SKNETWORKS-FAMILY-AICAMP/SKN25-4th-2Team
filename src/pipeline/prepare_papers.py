@@ -358,6 +358,7 @@ def aggregate_prepare_results(
     saved_papers = _sum_result_values(results, "saved_paper")
     saved_fulltexts = _sum_result_values(results, "saved_fulltext")
     saved_chunks = _sum_result_values(results, "saved_chunks")
+    prepared_arxiv_ids = [str(result.get("arxiv_id") or "").strip() for result in results if result.get("arxiv_id")]
 
     return {
         "stage": "prepare_papers",
@@ -370,6 +371,7 @@ def aggregate_prepare_results(
         "saved_papers": saved_papers,
         "saved_fulltexts": saved_fulltexts,
         "saved_chunks": saved_chunks,
+        "prepared_arxiv_ids": prepared_arxiv_ids,
         "skipped_by_category": skipped_by_category,
         "fallback_fulltexts": fallback_fulltexts,
         "sample_prepared": _build_sample_prepared(results),
@@ -384,6 +386,7 @@ def aggregate_prepare_results(
                 "saved_papers": saved_papers,
                 "saved_chunks": saved_chunks,
                 "fallback_fulltexts": fallback_fulltexts,
+                "prepared_arxiv_count": len(prepared_arxiv_ids),
             },
         ),
     }
@@ -580,6 +583,7 @@ def run_backfill_prepare_papers(
                 "saved_chunks": int(result.get("saved_chunks", 0) or 0),
                 "fallback_fulltexts": int(result.get("fallback_fulltexts", 0) or 0),
                 "selected_candidate_count": int(result.get("selected_candidate_count", 0) or 0),
+                "prepared_arxiv_ids": [str(value) for value in result.get("prepared_arxiv_ids", []) if str(value).strip()],
             }
         )
         next_cursor_date = next_cursor_candidate.isoformat() if next_cursor_candidate >= normalized_oldest_date else None
@@ -678,6 +682,7 @@ def run_consume_prepare_queue(
                     "saved_chunks": int(result.get("saved_chunks", 0) or 0),
                     "fallback_fulltexts": int(result.get("fallback_fulltexts", 0) or 0),
                     "selected_candidate_count": int(result.get("selected_candidate_count", 0) or 0),
+                    "prepared_arxiv_count": len([str(value) for value in result.get("prepared_arxiv_ids", []) if str(value).strip()]),
                 },
             )
         except Exception as exc:
@@ -693,6 +698,7 @@ def run_consume_prepare_queue(
                 "saved_chunks": int(result.get("saved_chunks", 0) or 0),
                 "fallback_fulltexts": int(result.get("fallback_fulltexts", 0) or 0),
                 "selected_candidate_count": int(result.get("selected_candidate_count", 0) or 0),
+                "prepared_arxiv_ids": [str(value) for value in result.get("prepared_arxiv_ids", []) if str(value).strip()],
             }
         )
 

@@ -1,4 +1,4 @@
-"""로컬 GPU 환경에서 prepare 자동추적/백필을 실행하는 워커 모듈."""
+"""로컬 GPU 환경에서 prepare 자동추적/백필과 후속 임베딩을 실행하는 워커 모듈."""
 
 from __future__ import annotations
 
@@ -7,15 +7,126 @@ import json
 import time
 from typing import Any
 
-from src.pipeline import run_backfill_prepare_papers, run_consume_prepare_queue
+from src.pipeline import run_backfill_prepare_papers, run_consume_prepare_queue, run_embed_papers
+
+
+def _normalize_optional_positive_int(value: int | str | None, default: int) -> int:
+    if value is None:
+        return default
+    if isinstance(value, int):
+        return value if value > 0 else default
+    normalized = str(value).strip()
+    if not normalized:
+        return default
+    parsed = int(normalized)
+    return parsed if parsed > 0 else default
+
+
+def _collect_prepared_arxiv_ids(prepare_result: dict[str, Any]) -> list[str]:
+    seen: set[str] = set()
+    collected: list[str] = []
+    for success in prepare_result.get("successes", []):
+        if not isinstance(success, dict):
+            continue
+        for value in success.get("prepared_arxiv_ids", []):
+            arxiv_id = str(value or "").strip()
+            if not arxiv_id or arxiv_id in seen:
+                continue
+            seen.add(arxiv_id)
+            collected.append(arxiv_id)
+    return collected
+
+
+def _run_embed_after_prepare(
+    *,
+    prepare_result: dict[str, Any],
+    embed_max_chunks: int,
+) -> dict[str, Any]:
+    arxiv_ids = _collect_prepared_arxiv_ids(prepare_result)
+    if not arxiv_ids:
+        return {
+            "stage": "embed_after_prepare",
+            "status": "no_op",
+            "target_arxiv_count": 0,
+            "embedded_arxiv_count": 0,
+            "selected_chunk_count": 0,
+            "embedded_chunk_count": 0,
+            "failures": [],
+        }
+
+    failures: list[dict[str, str]] = []
+    per_arxiv: list[dict[str, Any]] = []
+    total_selected = 0
+    total_embedded = 0
+    embedded_arxiv_count = 0
+
+    for arxiv_id in arxiv_ids:
+        selected_sum = 0
+        embedded_sum = 0
+        try:
+            # arxiv_id별로 아직 임베딩이 없는 chunk가 남아 있으면 반복 처리한다.
+            for _ in range(100):
+                embed_result = run_embed_papers(
+                    runtime="local",
+                    user="local_prepare_worker",
+                    max_chunks=embed_max_chunks,
+                    arxiv_id=arxiv_id,
+                )
+                status = str(embed_result.get("status") or "")
+                selected = int(embed_result.get("selected_chunk_count", 0) or 0)
+                embedded = int(embed_result.get("embedded_chunk_count", 0) or 0)
+                selected_sum += selected
+                embedded_sum += embedded
+
+                if status == "no_op" or selected < embed_max_chunks:
+                    break
+            else:
+                failures.append({"arxiv_id": arxiv_id, "error": "embed_loop_limit_exceeded"})
+                continue
+        except Exception as exc:
+            failures.append({"arxiv_id": arxiv_id, "error": str(exc)})
+            continue
+
+        total_selected += selected_sum
+        total_embedded += embedded_sum
+        if embedded_sum > 0:
+            embedded_arxiv_count += 1
+        per_arxiv.append(
+            {
+                "arxiv_id": arxiv_id,
+                "selected_chunk_count": selected_sum,
+                "embedded_chunk_count": embedded_sum,
+            }
+        )
+
+    if failures and embedded_arxiv_count == 0:
+        status = "failed"
+    elif failures:
+        status = "partial_failed"
+    elif total_embedded == 0:
+        status = "no_op"
+    else:
+        status = "success"
+
+    return {
+        "stage": "embed_after_prepare",
+        "status": status,
+        "target_arxiv_count": len(arxiv_ids),
+        "embedded_arxiv_count": embedded_arxiv_count,
+        "selected_chunk_count": total_selected,
+        "embedded_chunk_count": total_embedded,
+        "per_arxiv": per_arxiv,
+        "failures": failures,
+    }
 
 
 def _run_once(args: argparse.Namespace) -> dict[str, Any]:
     normalized_worker_id = (args.worker_id or args.state_name or "").strip() or "default"
     normalized_max_papers = (args.max_papers or "").strip() or None
+    normalized_embed_max_chunks = _normalize_optional_positive_int(args.embed_max_chunks, default=200)
 
     if args.mode == "auto":
-        return run_consume_prepare_queue(
+        prepare_result = run_consume_prepare_queue(
             runtime="local",
             user="local_prepare_worker",
             mode="auto",
@@ -23,6 +134,27 @@ def _run_once(args: argparse.Namespace) -> dict[str, Any]:
             max_jobs_per_run=max(1, int(args.max_jobs_per_run)),
             max_papers=normalized_max_papers,
         )
+        if args.skip_embed or int(prepare_result.get("success_count", 0) or 0) <= 0:
+            prepare_result["embed"] = {
+                "stage": "embed_after_prepare",
+                "status": "skipped" if args.skip_embed else "no_op",
+                "reason": "skip_embed_enabled" if args.skip_embed else "no_prepare_success",
+            }
+            return prepare_result
+
+        embed_result = _run_embed_after_prepare(
+            prepare_result=prepare_result,
+            embed_max_chunks=normalized_embed_max_chunks,
+        )
+        prepare_result["embed"] = embed_result
+
+        embed_status = str(embed_result.get("status") or "")
+        prepare_status = str(prepare_result.get("status") or "")
+        if embed_status == "failed" and prepare_status not in {"failed"}:
+            prepare_result["status"] = "failed"
+        elif embed_status == "partial_failed" and prepare_status == "success":
+            prepare_result["status"] = "partial_failed"
+        return prepare_result
 
     return run_backfill_prepare_papers(
         runtime="local",
@@ -48,6 +180,17 @@ def main() -> int:
     parser.add_argument("--oldest-date", default="", help="종료 기준 날짜(YYYY-MM-DD). 비우면 state 또는 기본값을 사용한다.")
     parser.add_argument("--batch-days", type=int, default=3, help="한 번에 처리할 날짜 수. 기본값은 3이다.")
     parser.add_argument("--max-papers", default="", help="날짜당 최대 논문 수. 비우면 해당 날짜 전체를 처리한다.")
+    parser.add_argument(
+        "--embed-max-chunks",
+        type=int,
+        default=200,
+        help="auto 모드에서 arXiv별 임베딩 배치 크기. 기본값은 200이다.",
+    )
+    parser.add_argument(
+        "--skip-embed",
+        action="store_true",
+        help="auto 모드에서 prepare 성공 후 자동 임베딩을 비활성화한다.",
+    )
     parser.add_argument("--worker-id", default="default", help="큐 작업 선점에 사용하는 워커 식별자.")
     parser.add_argument("--state-name", default="", help="deprecated: --worker-id를 사용한다.")
     parser.add_argument(
