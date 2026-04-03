@@ -76,6 +76,34 @@ class RawPaperStore:
         collection = self._collection()
         return collection.count_documents({"source": "hf_daily_papers", "date": date}, limit=1) > 0
 
+    def list_daily_papers_dates(
+        self,
+        *,
+        date_gt: str | None = None,
+        date_gte: str | None = None,
+        date_lte: str | None = None,
+        limit: int | None = None,
+        ascending: bool = True,
+    ) -> list[str]:
+        """조건에 맞는 HF Daily Papers raw 날짜 목록을 정렬해 조회한다."""
+        collection = self._collection()
+        date_filter: dict[str, Any] = {}
+        if date_gt:
+            date_filter["$gt"] = date_gt
+        if date_gte:
+            date_filter["$gte"] = date_gte
+        if date_lte:
+            date_filter["$lte"] = date_lte
+
+        query: dict[str, Any] = {"source": "hf_daily_papers"}
+        if date_filter:
+            query["date"] = date_filter
+
+        cursor = collection.find(query, {"_id": 0, "date": 1}).sort("date", 1 if ascending else -1)
+        if isinstance(limit, int) and limit > 0:
+            cursor = cursor.limit(limit)
+        return [str(item.get("date")) for item in cursor if item.get("date")]
+
     def load_pipeline_state(self, *, pipeline: str, name: str = "default") -> dict[str, Any] | None:
         """파이프라인 진행 상태 문서를 읽는다."""
         collection = self._state_collection()

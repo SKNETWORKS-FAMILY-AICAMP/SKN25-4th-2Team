@@ -368,15 +368,27 @@ class PaperRepository:
             for row in rows
         ]
 
-    def list_chunk_candidates_by_query(self, query: str, *, limit: int = 5) -> list[dict[str, Any]]:
+    def list_chunk_candidates_by_query(
+        self,
+        query: str,
+        *,
+        limit: int = 5,
+        arxiv_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         """최소 retrieval 용도로 FTS/ILIKE 기반 청크 후보를 조회한다."""
         normalized_query = " ".join(query.split())
         if not normalized_query:
             return []
 
+        arxiv_filter_sql = ""
+        arxiv_filter_params: tuple[Any, ...] = ()
+        if arxiv_id:
+            arxiv_filter_sql = " AND c.arxiv_id = %s"
+            arxiv_filter_params = (arxiv_id,)
+
         with self._connection() as connection, connection.cursor() as cursor:
             cursor.execute(
-                """
+                f"""
                 WITH ranked AS (
                     SELECT
                         c.id AS chunk_id,
@@ -408,14 +420,19 @@ class PaperRepository:
                     FROM paper_chunks c
                     JOIN papers p ON p.arxiv_id = c.arxiv_id
                     WHERE
+                        1 = 1
+                        {arxiv_filter_sql}
+                        AND
                         (
-                            setweight(to_tsvector('english', coalesce(p.title, '')), 'A') ||
-                            setweight(to_tsvector('english', coalesce(p.abstract, '')), 'B') ||
-                            setweight(to_tsvector('english', coalesce(c.chunk_text, '')), 'C')
-                        ) @@ websearch_to_tsquery('english', %s)
-                        OR p.title ILIKE ('%%' || %s || '%%')
-                        OR p.abstract ILIKE ('%%' || %s || '%%')
-                        OR c.chunk_text ILIKE ('%%' || %s || '%%')
+                            (
+                                setweight(to_tsvector('english', coalesce(p.title, '')), 'A') ||
+                                setweight(to_tsvector('english', coalesce(p.abstract, '')), 'B') ||
+                                setweight(to_tsvector('english', coalesce(c.chunk_text, '')), 'C')
+                            ) @@ websearch_to_tsquery('english', %s)
+                            OR p.title ILIKE ('%%' || %s || '%%')
+                            OR p.abstract ILIKE ('%%' || %s || '%%')
+                            OR c.chunk_text ILIKE ('%%' || %s || '%%')
+                        )
                 )
                 SELECT
                     chunk_id,
@@ -431,7 +448,8 @@ class PaperRepository:
                 ORDER BY score DESC, chunk_id DESC
                 LIMIT %s
                 """,
-                (
+                arxiv_filter_params
+                + (
                     normalized_query,
                     normalized_query,
                     normalized_query,

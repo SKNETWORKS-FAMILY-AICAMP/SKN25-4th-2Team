@@ -73,7 +73,7 @@ docker logs -f arxplore-layout-parser
 2. `backfill_collect_papers`
    과거 HF Daily Papers 원본을 하루 최대 30일씩 순차 백필합니다.
 3. `prepare_papers`
-   HF raw 기반 메타데이터와 PDF 파싱 결과를 PostgreSQL에 적재합니다.
+   로컬 GPU 워커에서 HF raw 기반 메타데이터와 PDF 파싱 결과를 PostgreSQL에 적재합니다.
 4. `enrich_papers_metadata`
    저장된 논문에 arXiv 메타데이터를 후속 보강합니다.
 5. `embed_papers`
@@ -94,7 +94,6 @@ src/core/               도메인 모델, 프롬프트, 체인
 src/integrations/       외부 서비스 및 저장소 연동
 src/pipeline/           파이프라인 실행 진입점
 src/shared/             공통 설정과 tracing
-tests/                  회귀 및 통합 테스트
 ```
 
 ## Documents

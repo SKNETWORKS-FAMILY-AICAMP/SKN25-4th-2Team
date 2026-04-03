@@ -78,6 +78,12 @@ cd ArXplore
 
 전달받은 `.env` 파일을 프로젝트 루트에 둔다. 서버 접속 정보, DB 계정 등은 이미 설정되어 있다.
 
+`.env`를 수정한 뒤에는 `docker compose restart`만으로 값이 다시 주입되지 않을 수 있다. 환경 변수 변경을 반영해야 할 때는 기존 컨테이너를 재시작하는 대신 아래처럼 재생성한다.
+
+```bash
+docker compose -p arxplore_dev up -d --force-recreate dev
+```
+
 주요 값은 다음과 같다.
 
 - `COMPOSE_PROJECT_NAME=arxplore`
@@ -156,6 +162,18 @@ docker logs -f arxplore-layout-parser
 - parser는 가능하면 GPU를 사용하고, GPU가 없으면 CPU로 fallback한다.
 - parser가 없어도 `pypdf` fallback 경로는 동작하지만 품질 검증은 parser를 켠 상태를 기준으로 수행한다.
 
+로컬 GPU에서 prepare를 실행할 때는 아래 워커 스크립트를 사용한다.
+
+```bash
+docker compose -p arxplore_dev exec dev bash -lc 'cd /workspace && python3 scripts/run_prepare_worker.py --mode auto --loop --sleep-seconds 120'
+```
+
+과거 raw를 파싱해 적재할 때만 backfill 모드를 수동으로 사용한다.
+
+```bash
+docker compose -p arxplore_dev exec dev bash -lc 'cd /workspace && python3 scripts/run_prepare_worker.py --mode backfill --batch-days 3 --loop --sleep-seconds 120'
+```
+
 ## 9. 서버 스택 실행
 
 인프라, Airflow, DB, 통합 테스트 담당자는 아래 명령으로 서버 스택을 올릴 수 있다.
@@ -199,6 +217,14 @@ sudo service ssh start
 sudo apt install openssh-server -y
 sudo service ssh start
 bash scripts/port-forward.sh
+```
+
+중복 실행이나 포트 충돌 시에는 아래 제어 명령을 사용한다.
+
+```bash
+bash scripts/port-forward.sh status
+bash scripts/port-forward.sh stop
+bash scripts/port-forward.sh restart
 ```
 
 포워딩되는 주소:

@@ -50,7 +50,9 @@ class AppSettings(BaseSettings):
 
     openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o", alias="OPENAI_MODEL")
-    openai_embedding_model: str = Field(default="text-embedding-3-small", alias="OPENAI_EMBEDDING_MODEL")
+    openai_embedding_model: str = Field(default="text-embedding-3-large", alias="OPENAI_EMBEDDING_MODEL")
+    openai_embedding_dimensions: int = Field(default=1536, alias="OPENAI_EMBEDDING_DIMENSIONS")
+    embedding_batch_size: int = Field(default=64, alias="EMBEDDING_BATCH_SIZE")
 
 
 def resolve_host_and_port(host: str, default_port: int) -> tuple[str, int]:

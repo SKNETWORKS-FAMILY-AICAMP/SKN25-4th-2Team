@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date as date_cls
+from datetime import date as date_cls, timedelta
 from typing import Any, Optional
 
 from src.integrations.fulltext_parser import FulltextParser
@@ -427,3 +427,332 @@ def run_prepare_papers(
         runtime=runtime,
         user=user,
     )
+
+
+def _build_prepare_backfill_dates(
+    *,
+    cursor_date: date_cls,
+    oldest_date: date_cls,
+    batch_days: int,
+) -> list[date_cls]:
+    dates: list[date_cls] = []
+    current = cursor_date
+    while current >= oldest_date and len(dates) < batch_days:
+        dates.append(current)
+        current -= timedelta(days=1)
+    return dates
+
+
+def _resolve_prepare_oldest_date(
+    *,
+    oldest_date: str | None,
+    existing_state: dict[str, Any] | None,
+    today: date_cls,
+) -> date_cls:
+    if oldest_date:
+        return date_cls.fromisoformat(oldest_date)
+    if existing_state and existing_state.get("oldest_date"):
+        return date_cls.fromisoformat(str(existing_state["oldest_date"]))
+    return today - timedelta(days=365)
+
+
+def _resolve_prepare_cursor_date(
+    *,
+    cursor_date: str | None,
+    existing_state: dict[str, Any] | None,
+    today: date_cls,
+) -> date_cls:
+    if cursor_date:
+        return date_cls.fromisoformat(cursor_date)
+    if existing_state and existing_state.get("cursor_date"):
+        return date_cls.fromisoformat(str(existing_state["cursor_date"]))
+    return today - timedelta(days=1)
+
+
+def run_backfill_prepare_papers(
+    *,
+    runtime: str = "local",
+    user: Optional[str] = None,
+    cursor_date: str | None = None,
+    oldest_date: str | None = None,
+    batch_days: int = 7,
+    state_name: str = "default",
+    max_papers: int | str | None = None,
+    allowed_categories: set[str] | None = None,
+) -> dict[str, Any]:
+    """로컬 GPU 환경에서 prepare_papers를 날짜 배치 단위로 순차 실행한다."""
+    today = date_cls.today()
+    raw_store = RawPaperStore()
+
+    existing_state = raw_store.load_pipeline_state(
+        pipeline="prepare_papers_backfill",
+        name=state_name,
+    )
+    normalized_oldest_date = _resolve_prepare_oldest_date(
+        oldest_date=oldest_date,
+        existing_state=existing_state,
+        today=today,
+    )
+    normalized_cursor_date = _resolve_prepare_cursor_date(
+        cursor_date=cursor_date,
+        existing_state=existing_state,
+        today=today,
+    )
+    normalized_batch_days = max(1, int(batch_days or 7))
+
+    if normalized_cursor_date < normalized_oldest_date:
+        state = {
+            "cursor_date": None,
+            "oldest_date": normalized_oldest_date.isoformat(),
+            "batch_days": normalized_batch_days,
+            "status": "completed",
+            "last_processed_dates": [],
+            "last_failure": None,
+        }
+        raw_store.save_pipeline_state(
+            pipeline="prepare_papers_backfill",
+            name=state_name,
+            state=state,
+        )
+        return {
+            "stage": "backfill_prepare_papers",
+            "status": "completed",
+            "state_name": state_name,
+            "cursor_date": normalized_cursor_date.isoformat(),
+            "next_cursor_date": None,
+            "oldest_date": normalized_oldest_date.isoformat(),
+            "batch_days": normalized_batch_days,
+            "success_count": 0,
+            "skipped_missing_raw_count": 0,
+            "failure_count": 0,
+            "successes": [],
+            "skipped_missing_raw": [],
+            "failures": [],
+            "stopped_reason": "cursor_exhausted",
+            "trace_config": build_pipeline_trace_config(
+                stage="backfill_prepare_papers",
+                runtime=runtime,
+                user=user,
+            ),
+        }
+
+    target_dates = _build_prepare_backfill_dates(
+        cursor_date=normalized_cursor_date,
+        oldest_date=normalized_oldest_date,
+        batch_days=normalized_batch_days,
+    )
+    successes: list[dict[str, Any]] = []
+    skipped_missing_raw: list[str] = []
+    failures: list[dict[str, str]] = []
+    next_cursor_date: str | None = None
+    stopped_reason = "batch_complete"
+
+    for target in target_dates:
+        target_str = target.isoformat()
+        next_cursor_candidate = target - timedelta(days=1)
+
+        if not raw_store.has_daily_papers_response(date=target_str):
+            skipped_missing_raw.append(target_str)
+            next_cursor_date = (
+                next_cursor_candidate.isoformat() if next_cursor_candidate >= normalized_oldest_date else None
+            )
+            continue
+
+        try:
+            result = run_prepare_papers(
+                runtime=runtime,
+                user=user,
+                target_date=target_str,
+                max_papers=max_papers,
+                allowed_categories=allowed_categories,
+            )
+        except Exception as exc:
+            failures.append({"date": target_str, "error": str(exc)})
+            stopped_reason = "prepare_failed"
+            next_cursor_date = target_str
+            break
+
+        successes.append(
+            {
+                "date": target_str,
+                "saved_papers": int(result.get("saved_papers", 0) or 0),
+                "saved_fulltexts": int(result.get("saved_fulltexts", 0) or 0),
+                "saved_chunks": int(result.get("saved_chunks", 0) or 0),
+                "fallback_fulltexts": int(result.get("fallback_fulltexts", 0) or 0),
+                "selected_candidate_count": int(result.get("selected_candidate_count", 0) or 0),
+            }
+        )
+        next_cursor_date = next_cursor_candidate.isoformat() if next_cursor_candidate >= normalized_oldest_date else None
+
+    status = "failed" if failures else ("completed" if next_cursor_date is None else "success")
+    state = {
+        "cursor_date": next_cursor_date,
+        "oldest_date": normalized_oldest_date.isoformat(),
+        "batch_days": normalized_batch_days,
+        "status": status,
+        "last_processed_dates": [item["date"] for item in successes] + skipped_missing_raw,
+        "last_failure": failures[0] if failures else None,
+    }
+    raw_store.save_pipeline_state(
+        pipeline="prepare_papers_backfill",
+        name=state_name,
+        state=state,
+    )
+
+    trace_config = build_pipeline_trace_config(
+        stage="backfill_prepare_papers",
+        runtime=runtime,
+        user=user,
+        extra_metadata={
+            "state_name": state_name,
+            "cursor_date": normalized_cursor_date.isoformat(),
+            "next_cursor_date": next_cursor_date,
+            "oldest_date": normalized_oldest_date.isoformat(),
+            "batch_days": normalized_batch_days,
+            "success_count": len(successes),
+            "skipped_missing_raw_count": len(skipped_missing_raw),
+            "failure_count": len(failures),
+            "stopped_reason": stopped_reason,
+        },
+    )
+
+    return {
+        "stage": "backfill_prepare_papers",
+        "status": status,
+        "state_name": state_name,
+        "cursor_date": normalized_cursor_date.isoformat(),
+        "next_cursor_date": next_cursor_date,
+        "oldest_date": normalized_oldest_date.isoformat(),
+        "batch_days": normalized_batch_days,
+        "success_count": len(successes),
+        "skipped_missing_raw_count": len(skipped_missing_raw),
+        "failure_count": len(failures),
+        "successes": successes,
+        "skipped_missing_raw": skipped_missing_raw,
+        "failures": failures,
+        "stopped_reason": stopped_reason,
+        "trace_config": trace_config,
+    }
+
+
+def run_track_prepare_papers(
+    *,
+    runtime: str = "local",
+    user: Optional[str] = None,
+    state_name: str = "default",
+    max_dates_per_run: int = 1,
+    max_papers: int | str | None = None,
+    allowed_categories: set[str] | None = None,
+    bootstrap_cursor_date: str | None = None,
+) -> dict[str, Any]:
+    """최신 수집 날짜만 자동 추적해 prepare를 수행한다.
+
+    기본 동작은 기존 누적 raw를 전부 처리하지 않고, cursor 이후 신규 날짜만 처리한다.
+    """
+    raw_store = RawPaperStore()
+    today = date_cls.today().isoformat()
+    normalized_max_dates = max(1, int(max_dates_per_run or 1))
+    pipeline_name = "prepare_papers_auto_track"
+
+    existing_state = raw_store.load_pipeline_state(pipeline=pipeline_name, name=state_name)
+    if existing_state and existing_state.get("cursor_date"):
+        cursor_date = str(existing_state["cursor_date"])
+    elif bootstrap_cursor_date:
+        cursor_date = date_cls.fromisoformat(bootstrap_cursor_date).isoformat()
+    else:
+        cursor_date = (date_cls.today() - timedelta(days=1)).isoformat()
+
+    target_dates = raw_store.list_daily_papers_dates(
+        date_gt=cursor_date,
+        date_lte=today,
+        limit=normalized_max_dates,
+        ascending=True,
+    )
+
+    if not target_dates:
+        state = {
+            "cursor_date": cursor_date,
+            "status": "no_op",
+            "last_processed_dates": [],
+            "last_failure": None,
+        }
+        raw_store.save_pipeline_state(pipeline=pipeline_name, name=state_name, state=state)
+        return {
+            "stage": "track_prepare_papers",
+            "status": "no_op",
+            "state_name": state_name,
+            "cursor_date": cursor_date,
+            "next_cursor_date": cursor_date,
+            "selected_dates": [],
+            "success_count": 0,
+            "failure_count": 0,
+            "successes": [],
+            "failures": [],
+            "trace_config": build_pipeline_trace_config(stage="track_prepare_papers", runtime=runtime, user=user),
+        }
+
+    successes: list[dict[str, Any]] = []
+    failures: list[dict[str, str]] = []
+    next_cursor_date = cursor_date
+
+    for target_date in target_dates:
+        try:
+            result = run_prepare_papers(
+                runtime=runtime,
+                user=user,
+                target_date=target_date,
+                max_papers=max_papers,
+                allowed_categories=allowed_categories,
+            )
+        except Exception as exc:
+            failures.append({"date": target_date, "error": str(exc)})
+            break
+
+        successes.append(
+            {
+                "date": target_date,
+                "saved_papers": int(result.get("saved_papers", 0) or 0),
+                "saved_fulltexts": int(result.get("saved_fulltexts", 0) or 0),
+                "saved_chunks": int(result.get("saved_chunks", 0) or 0),
+                "fallback_fulltexts": int(result.get("fallback_fulltexts", 0) or 0),
+                "selected_candidate_count": int(result.get("selected_candidate_count", 0) or 0),
+            }
+        )
+        next_cursor_date = target_date
+
+    status = "failed" if failures else "success"
+    state = {
+        "cursor_date": next_cursor_date,
+        "status": status,
+        "last_processed_dates": [item["date"] for item in successes],
+        "last_failure": failures[0] if failures else None,
+    }
+    raw_store.save_pipeline_state(pipeline=pipeline_name, name=state_name, state=state)
+
+    trace_config = build_pipeline_trace_config(
+        stage="track_prepare_papers",
+        runtime=runtime,
+        user=user,
+        extra_metadata={
+            "state_name": state_name,
+            "cursor_date": cursor_date,
+            "next_cursor_date": next_cursor_date,
+            "selected_dates": target_dates,
+            "success_count": len(successes),
+            "failure_count": len(failures),
+        },
+    )
+
+    return {
+        "stage": "track_prepare_papers",
+        "status": status,
+        "state_name": state_name,
+        "cursor_date": cursor_date,
+        "next_cursor_date": next_cursor_date,
+        "selected_dates": target_dates,
+        "success_count": len(successes),
+        "failure_count": len(failures),
+        "successes": successes,
+        "failures": failures,
+        "trace_config": trace_config,
+    }

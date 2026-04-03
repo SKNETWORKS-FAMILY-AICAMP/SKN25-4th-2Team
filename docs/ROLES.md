@@ -152,7 +152,7 @@ ArXplore에서는 다음 용어를 공통으로 사용한다.
 - `src/integrations/topic_repository.py`
 - `src/integrations/fulltext_parser.py`
 - `src/integrations/layout_parser_client.py`
-- `src/integrations/minimum_retriever.py`
+- `src/integrations/paper_retriever.py`
 
 **공용 설정**
 

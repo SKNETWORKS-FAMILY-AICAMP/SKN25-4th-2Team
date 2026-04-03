@@ -2,7 +2,7 @@
 
 __all__ = [
     "EmbeddingClient",
-    "MinimumRetriever",
+    "PaperRetriever",
     "PaperRepository",
     "PaperSearchClient",
     "RawPaperStore",
@@ -20,10 +20,10 @@ def __getattr__(name: str):
         from .paper_repository import PaperRepository
 
         return PaperRepository
-    if name == "MinimumRetriever":
-        from .minimum_retriever import MinimumRetriever
+    if name == "PaperRetriever":
+        from .paper_retriever import PaperRetriever
 
-        return MinimumRetriever
+        return PaperRetriever
     if name == "PaperSearchClient":
         from .paper_search import PaperSearchClient
 
