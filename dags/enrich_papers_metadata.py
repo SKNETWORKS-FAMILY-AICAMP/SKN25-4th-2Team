@@ -12,7 +12,7 @@ from src.pipeline import run_enrich_papers_metadata
 
 @dag(
     dag_id="arxplore_enrich_papers_metadata",
-    schedule="30 20 * * *",
+    schedule="30 */3 * * *",
     start_date=datetime(2026, 1, 1, tzinfo=ZoneInfo("Asia/Seoul")),
     catchup=False,
     params={"max_papers": 30},

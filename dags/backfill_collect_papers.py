@@ -12,7 +12,7 @@ from src.pipeline import run_backfill_collect_papers
 
 @dag(
     dag_id="arxplore_backfill_collect_papers",
-    schedule="0 19 * * *",
+    schedule="0 */3 * * *",
     start_date=datetime(2026, 1, 1, tzinfo=ZoneInfo("Asia/Seoul")),
     catchup=False,
     params={
