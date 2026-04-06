@@ -2,8 +2,12 @@
 
 from .key_findings import KEY_FINDINGS_PROMPT
 from .overview import OVERVIEW_PROMPT
+from .paper_key_findings import PAPER_KEY_FINDINGS_PROMPT
+from .paper_overview import PAPER_OVERVIEW_PROMPT
 
 __all__ = [
     "KEY_FINDINGS_PROMPT",
     "OVERVIEW_PROMPT",
+    "PAPER_KEY_FINDINGS_PROMPT",
+    "PAPER_OVERVIEW_PROMPT",
 ]
