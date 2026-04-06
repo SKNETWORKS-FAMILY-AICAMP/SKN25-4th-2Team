@@ -35,6 +35,25 @@ def _compact_text(value: Any, *, max_chars: int) -> str:
     return text[: max_chars - 1].rstrip() + "…"
 
 
+def _normalize_paper_detail_input(paper: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(paper)
+
+    nested_fulltext = normalized.get("fulltext")
+    if isinstance(nested_fulltext, dict):
+        if not normalized.get("sections"):
+            normalized["sections"] = nested_fulltext.get("sections") or []
+        if not normalized.get("fulltext_text"):
+            normalized["fulltext_text"] = nested_fulltext.get("text") or nested_fulltext.get("fulltext_text") or ""
+
+    if not normalized.get("fulltext_text"):
+        normalized["fulltext_text"] = normalized.get("text") or ""
+
+    if not normalized.get("sections"):
+        normalized["sections"] = []
+
+    return normalized
+
+
 def _extract_author_names(authors: Any) -> list[str]:
     if not authors:
         return []
@@ -128,10 +147,11 @@ def _format_paper_sections(paper: dict[str, Any], *, max_chars_per_section: int 
 
 
 def has_paper_detail_context(paper: dict[str, Any]) -> bool:
-    sections = paper.get("sections")
+    normalized = _normalize_paper_detail_input(paper)
+    sections = normalized.get("sections")
     if isinstance(sections, list) and any(isinstance(section, dict) and section.get("text") for section in sections):
         return True
-    return bool(str(paper.get("fulltext_text") or "").strip())
+    return bool(str(normalized.get("fulltext_text") or "").strip())
 
 
 def _extract_key_findings(text: str, *, max_items: int = 6) -> list[str]:
@@ -166,7 +186,8 @@ def build_paper_overview(
     user: Optional[str] = None,
     quality_score: float | None = None,
 ) -> str:
-    if not has_paper_detail_context(paper):
+    normalized = _normalize_paper_detail_input(paper)
+    if not has_paper_detail_context(normalized):
         raise ValueError("상세 논문 설명을 생성하려면 본문 섹션 또는 fulltext_text가 필요합니다.")
 
     chain = PAPER_OVERVIEW_PROMPT | _build_llm() | StrOutputParser()
@@ -177,8 +198,8 @@ def build_paper_overview(
     )
     return chain.invoke(
         {
-            "paper_metadata": _format_paper_metadata(paper),
-            "paper_sections": _format_paper_sections(paper),
+            "paper_metadata": _format_paper_metadata(normalized),
+            "paper_sections": _format_paper_sections(normalized),
         },
         config=config,
     )
@@ -191,7 +212,8 @@ def build_paper_key_findings(
     user: Optional[str] = None,
     quality_score: float | None = None,
 ) -> list[str]:
-    if not has_paper_detail_context(paper):
+    normalized = _normalize_paper_detail_input(paper)
+    if not has_paper_detail_context(normalized):
         raise ValueError("상세 논문 설명을 생성하려면 본문 섹션 또는 fulltext_text가 필요합니다.")
 
     chain = PAPER_KEY_FINDINGS_PROMPT | _build_llm() | StrOutputParser()
@@ -202,8 +224,8 @@ def build_paper_key_findings(
     )
     response = chain.invoke(
         {
-            "paper_metadata": _format_paper_metadata(paper),
-            "paper_sections": _format_paper_sections(paper),
+            "paper_metadata": _format_paper_metadata(normalized),
+            "paper_sections": _format_paper_sections(normalized),
         },
         config=config,
     )
@@ -217,10 +239,11 @@ def analyze_paper_detail(
     runtime: str = "dev",
     user: Optional[str] = None,
 ) -> PaperDetailDocument:
+    normalized = _normalize_paper_detail_input(paper)
     return PaperDetailDocument(
-        arxiv_id=str(paper.get("arxiv_id") or ""),
-        title=str(paper.get("title") or "제목 없음"),
-        overview=build_paper_overview(paper, runtime=runtime, user=user),
-        key_findings=build_paper_key_findings(paper, runtime=runtime, user=user),
+        arxiv_id=str(normalized.get("arxiv_id") or ""),
+        title=str(normalized.get("title") or "제목 없음"),
+        overview=build_paper_overview(normalized, runtime=runtime, user=user),
+        key_findings=build_paper_key_findings(normalized, runtime=runtime, user=user),
         generated_at=generated_at or datetime.now(timezone.utc),
     )

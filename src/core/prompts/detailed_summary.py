@@ -2,23 +2,27 @@
 
 from langchain_core.prompts import ChatPromptTemplate
 
-from src.core.prompt_rules import (
-    FORBIDDEN_PHRASES,
-    KOREAN_OUTPUT_RULES,
-    SUMMARY_SECTION_STRUCTURE,
-)
-
 DETAILED_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system",
         "당신은 AI 논문을 한국어로 구조화해 요약하는 전문가입니다. "
         "단순 번역이나 abstract 재서술이 아니라, "
         "논문의 문제 · 접근 · 실험 · 한계 · 가치를 분리해서 전달합니다.\n\n"
-        + KOREAN_OUTPUT_RULES
-        + "\n"
-        + FORBIDDEN_PHRASES
-        + "\n"
-        + SUMMARY_SECTION_STRUCTURE,
+        "요약 규칙:\n"
+        "- 논문에 명시된 내용만 사용한다. 추측, 전망, 과장은 쓰지 않는다.\n"
+        "- abstract를 그대로 옮기지 않는다. 문제 · 접근 · 결과를 재구성해서 전달한다.\n"
+        "- 전문 용어는 논문 원문 표기를 괄호에 병기할 수 있다.\n"
+        "- 자연스러운 한국어로 쓴다. 영어 어순을 그대로 옮기거나 직역투 표현은 피한다.\n"
+        "- 숫자와 수치는 논문 원문 그대로 표기한다.\n"
+        '- "혁신적인", "획기적인", "놀라운" 등 과장 수식어는 쓰지 않는다.\n'
+        '- "앞으로", "향후", "미래에는" 등 전망성 표현은 쓰지 않는다.\n'
+        '- "본 논문은 중요한 의미를 가진다", "새로운 접근 방식을 제시한다", "기여한다" 같은 내용 없는 마무리 문장은 쓰지 않는다.\n\n'
+        "상세 요약 섹션 구조:\n"
+        "1. 문제 정의: 이 논문이 풀려는 문제가 무엇인가\n"
+        "2. 접근 방법: 어떤 방식으로 접근했는가 (모델, 알고리즘, 데이터 설계 등)\n"
+        "3. 실험 및 결과: 어떤 실험을 했고 수치 결과는 무엇인가\n"
+        "4. 한계: 논문 스스로 인정하는 한계나 미해결 문제\n"
+        "5. 핵심 가치: 기존 연구와 비교해 이 연구만이 달성한 것이 무엇인가",
     ),
     (
         "human",

@@ -66,6 +66,8 @@ def build_analysis_trace_config(
         "overview",
         "key_findings",
         "topic_document",
+        "translation",
+        "detailed_summary",
         "analyze_paper_detail",
         "paper_overview",
         "paper_key_findings",
@@ -179,6 +181,34 @@ def build_paper_key_findings_trace_config(
 ) -> Dict[str, Any]:
     return build_analysis_trace_config(
         stage="paper_key_findings",
+        runtime=runtime,
+        user=user,
+        quality_score=quality_score,
+    )
+
+
+def build_translation_trace_config(
+    *,
+    runtime: str = "dev",
+    user: Optional[str] = None,
+    quality_score: Optional[float] = None,
+) -> Dict[str, Any]:
+    return build_analysis_trace_config(
+        stage="translation",
+        runtime=runtime,
+        user=user,
+        quality_score=quality_score,
+    )
+
+
+def build_detailed_summary_trace_config(
+    *,
+    runtime: str = "dev",
+    user: Optional[str] = None,
+    quality_score: Optional[float] = None,
+) -> Dict[str, Any]:
+    return build_analysis_trace_config(
+        stage="detailed_summary",
         runtime=runtime,
         user=user,
         quality_score=quality_score,

@@ -2,16 +2,22 @@
 
 from langchain_core.prompts import ChatPromptTemplate
 
-from src.core.prompt_rules import FORBIDDEN_PHRASES, KOREAN_OUTPUT_RULES
-
 TRANSLATION_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system",
         "당신은 AI 논문을 한국어로 번역하는 전문가입니다. "
         "질문에 답하기 위해 관련 논문 구절을 한국어로 정확하게 옮깁니다.\n\n"
-        + KOREAN_OUTPUT_RULES
-        + "\n"
-        + FORBIDDEN_PHRASES,
+        "번역 규칙:\n"
+        "- 논문 원문에 명시된 내용만 사용한다. 추측, 전망, 과장은 쓰지 않는다.\n"
+        "- 원문의 의미를 바꾸거나 빠뜨리지 않는다. 구조를 다시 요약하거나 재서술하지 않는다.\n"
+        "- 전문 용어는 가능한 한 영어 원문을 유지하고 자연스러운 한국어를 병기한다.\n"
+        "- 자연스러운 한국어로 쓰되, 영어 어순을 그대로 옮긴 직역투 표현은 피한다.\n"
+        "- 숫자, 수치, 단위, 비교 대상은 원문 그대로 유지한다.\n"
+        "- 번역문 외의 설명, 주석, 평가를 덧붙이지 않는다.\n\n"
+        "금지 표현:\n"
+        '- "혁신적인", "획기적인", "놀라운" 등 과장 수식어\n'
+        '- "앞으로", "향후", "미래에는" 등 전망성 표현\n'
+        '- "본 논문은 중요한 의미를 가진다" 등 근거 없는 가치 평가',
     ),
     (
         "human",
