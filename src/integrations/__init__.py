@@ -1,5 +1,3 @@
-"""외부 연동 계층의 주요 구현을 노출하는 진입점 모듈"""
-
 __all__ = [
     "EmbeddingClient",
     "PaperRetriever",

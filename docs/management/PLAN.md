@@ -278,12 +278,12 @@ PostgreSQL은 정제 데이터와 운영 queue를 함께 저장한다.
 - overview / key findings 품질 개선
 - 평가 루프 정리
 
-### Phase 5. UI 통합
+### Phase 5. UI 통합 및 에이전트 구축 (현재 완료)
 
-- 논문 목록 화면
-- 논문 상세 화면
-- 검색 + answer payload 소비
-- 상세 요약 / 번역 연결
+- Streamlit 단일 구조에서 `views/`, `components/` 모듈화 라우팅 방식으로 전환
+- 메모리를 유지하는 최상위 `agent_chat_page` (LangGraph React 에이전트 기반) 스마트 챗봇 신설
+- URL 하이퍼링크 다이렉트 문서 이동 지원 및 텍스트 청크 스트리밍 UI 연동 완료
+- 페이징 및 강제 스크롤 제어를 통한 검색 성능 체감 및 편의성 극대화
 
 ## 15. 역할 분담 전제
 
@@ -305,7 +305,6 @@ ArXplore는 현재 5역할 병렬 개발을 전제로 한다.
 - `python3 -m compileall src app dags`
 - `bash scripts/prepare-worker.sh once`
 - `streamlit run app/main.py --server.address=0.0.0.0`
-- `streamlit run app/paper_detail_demo.py --server.address=0.0.0.0`
 - Airflow DAG 목록에 `arxplore_daily_collect`, `arxplore_maintenance`가 표시되는지 확인
 - `notebooks/retrieval_inspection.ipynb`로 적재 상태와 retrieval 결과를 확인
 

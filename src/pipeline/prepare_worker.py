@@ -1,5 +1,3 @@
-"""로컬 GPU 환경의 prepare 자동추적, 백필, 후속 임베딩을 담당하는 워커 모듈"""
-
 from __future__ import annotations
 
 import argparse

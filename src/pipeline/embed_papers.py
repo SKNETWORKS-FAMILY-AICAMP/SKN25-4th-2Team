@@ -1,5 +1,3 @@
-"""논문 청크 임베딩 파이프라인을 담당하는 모듈"""
-
 from __future__ import annotations
 
 from typing import Any, Dict, Optional

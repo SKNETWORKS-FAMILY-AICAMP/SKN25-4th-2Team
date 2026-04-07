@@ -1,5 +1,3 @@
-"""논문 검색 API 연동을 담당하는 모듈"""
-
 from __future__ import annotations
 
 import html

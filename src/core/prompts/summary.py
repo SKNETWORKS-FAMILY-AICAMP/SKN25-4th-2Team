@@ -6,7 +6,7 @@
 
 from langchain_core.prompts import ChatPromptTemplate
 
-DETAILED_SUMMARY_SECTION_PROMPT = ChatPromptTemplate.from_messages([
+SUMMARY_SECTION_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system",
         "당신은 AI/ML 논문의 개별 섹션을 한국어로 정리하는 전문가다.\n"
@@ -44,7 +44,7 @@ DETAILED_SUMMARY_SECTION_PROMPT = ChatPromptTemplate.from_messages([
     ),
 ])
 
-DETAILED_SUMMARY_BUCKET_PROMPT = ChatPromptTemplate.from_messages([
+SUMMARY_BUCKET_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system",
         "당신은 AI/ML 논문의 같은 계열 섹션 해설들을 하나의 긴 통합 해설로 묶는 전문가다.\n"
@@ -78,7 +78,7 @@ DETAILED_SUMMARY_BUCKET_PROMPT = ChatPromptTemplate.from_messages([
     ),
 ])
 
-DETAILED_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
+SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
     (
         "system",
         "당신은 AI/ML 논문을 한국어로 깊이 있게 분석해 전달하는 전문가다.\n"

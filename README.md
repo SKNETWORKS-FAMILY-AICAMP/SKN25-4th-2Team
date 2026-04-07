@@ -105,7 +105,9 @@ docker compose -p arxplore_server -f docker-compose.server.yml ps
 ## Project Structure
 
 ```text
-app/                    Streamlit UI
+app/                    Streamlit 전역 라우터 (main.py)
+app/views/              페이지 뷰 (list, detail, agent_chat)
+app/components/         공통 UI 요소 및 이동 로직
 dags/                   Airflow DAG 정의
 docker/                 Docker 이미지와 실행 환경 설정
 docs/                   아키텍처, 워크플로우, 역할, 운영 문서
@@ -119,12 +121,14 @@ src/shared/             공통 설정과 tracing
 
 ## Documents
 
-- [Architecture](./docs/ARCHITECTURE.md)
-- [Workflow](./docs/WORKFLOW.md)
-- [Roles](./docs/ROLES.md)
-- [Team Setup](./docs/TEAM_SETUP.md)
-- [Plan](./docs/PLAN.md)
-- [AI Rules](./docs/AGENTS.md)
+## Documents
+
+- [Architecture](./docs/architecture/ARCHITECTURE.md)
+- [AI Rules](./docs/architecture/AGENTS.md)
+- [Plan](./docs/management/PLAN.md)
+- [Workflow](./docs/management/WORKFLOW.md)
+- [Roles](./docs/management/ROLES.md)
+- [Team Setup](./docs/management/TEAM_SETUP.md)
 
 ## License
 

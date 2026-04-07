@@ -2,7 +2,7 @@
 
 두 체인의 용도:
 - translate_chunk(): RAG 근거 chunk 단위 번역. 짧은 구절 단위 입력.
-- build_detailed_summary(): LangGraph 기반 논문 상세 요약. 섹션별 1차 해설 후 최종 본문을 생성.
+- build_summary(): LangGraph 기반 논문 상세 요약. 섹션별 1차 해설 후 최종 본문을 생성.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from langchain_openai import ChatOpenAI
 
 from src.shared import get_settings
 
-from .detailed_summary_graph import generate_detailed_summary_via_graph
+from .summary_graph import generate_summary_via_graph
 from .prompts import TRANSLATION_PROMPT
 from .tracing import build_translation_trace_config
 
@@ -86,7 +86,7 @@ def translate_chunk(
     return chain.invoke({"chunk_text": text}, config=config)
 
 
-def build_detailed_summary(
+def build_summary(
     *,
     title: str,
     authors: Any,
@@ -97,7 +97,7 @@ def build_detailed_summary(
     quality_score: float | None = None,
 ) -> str:
     """논문 전체 본문을 입력받아 LangGraph 기반 한국어 구조화 요약을 생성한다."""
-    return generate_detailed_summary_via_graph(
+    return generate_summary_via_graph(
         title=title or "제목 없음",
         authors=_format_authors(authors),
         text=str(text or "").strip(),

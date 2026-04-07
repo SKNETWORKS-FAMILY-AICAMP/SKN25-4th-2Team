@@ -1,5 +1,3 @@
-"""prepare job queue의 저장과 소비를 담당하는 모듈"""
-
 from __future__ import annotations
 
 from contextlib import contextmanager

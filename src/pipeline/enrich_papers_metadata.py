@@ -1,5 +1,3 @@
-"""저장된 논문의 arXiv 메타데이터 보강 파이프라인을 담당하는 모듈"""
-
 from __future__ import annotations
 
 from typing import Any, Optional

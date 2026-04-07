@@ -1,5 +1,3 @@
-"""pgvector 기반 벡터 저장과 검색을 담당하는 모듈"""
-
 from __future__ import annotations
 
 from contextlib import contextmanager

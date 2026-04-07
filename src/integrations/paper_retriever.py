@@ -1,5 +1,3 @@
-"""논문 chunk와 문맥 조회를 담당하는 모듈"""
-
 from __future__ import annotations
 
 import re

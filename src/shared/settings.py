@@ -1,5 +1,3 @@
-"""프로젝트 전역 환경설정 로딩과 연결 정보 해석을 담당하는 모듈"""
-
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional

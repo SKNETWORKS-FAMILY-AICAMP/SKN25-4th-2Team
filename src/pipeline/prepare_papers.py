@@ -1,5 +1,3 @@
-"""논문 전처리와 적재 파이프라인을 담당하는 모듈"""
-
 from __future__ import annotations
 
 from datetime import date as date_cls, timedelta

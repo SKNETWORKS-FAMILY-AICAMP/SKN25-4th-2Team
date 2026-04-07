@@ -1,5 +1,3 @@
-"""단일 논문 상세 문서 생성 체인을 담당하는 모듈"""
-
 from __future__ import annotations
 
 from datetime import datetime, timezone

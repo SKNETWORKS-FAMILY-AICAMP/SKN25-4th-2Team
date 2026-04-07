@@ -1,5 +1,3 @@
-"""정제된 논문 데이터 저장과 조회를 담당하는 모듈"""
-
 from __future__ import annotations
 
 from contextlib import contextmanager

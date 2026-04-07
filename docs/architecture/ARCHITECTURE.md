@@ -25,7 +25,7 @@ flowchart TD
     J --> K[arXiv metadata enrichment]
     K --> L[PostgreSQL + pgvector<br/>papers / fulltexts / chunks / embeddings]
     L --> M[Retrieval<br/>lexical / vector / hybrid / rerank]
-    L --> N[Paper Detail Generation<br/>overview / key_findings / detailed_summary / translation]
+    L --> N[Paper Detail Generation<br/>overview / key_findings / summary / translation]
     M --> O[RAG Answer Chain]
     N --> P[Streamlit UI]
     O --> P
@@ -137,7 +137,7 @@ Airflow와 worker가 호출하는 실행 진입점 계층이다.
 - `prompts/`
   - `overview.py`: 논문 overview 프롬프트
   - `key_findings.py`: 논문 핵심 포인트 프롬프트
-  - `detailed_summary.py`: 상세 요약 프롬프트
+  - `summary.py`: 상세 요약 프롬프트
   - `translation.py`: 근거 chunk 번역 프롬프트
 - `paper_chains.py`
   - 논문 상세 문서 생성 chain
@@ -240,7 +240,20 @@ PostgreSQL은 관계형 정제 데이터와 운영 queue를 함께 저장한다.
 
 즉 현재 retrieval 병목은 "벡터가 아예 없어서 검색이 안 되는 상태"가 아니라, 이미 동작하는 lexical/vector 기반을 어떻게 answer chain에 맞게 더 정교하게 고도화할 것인가에 가깝다.
 
-## 8. `PaperDetailDocument` 계약
+## 8. Agentic RAG (LangGraph 기반) 시스템
+
+단순한 프롬프트 질의응답을 넘어선 **지능형 질문-응답 파이프라인**을 구성하기 위해 LangGraph 최신 구조를 채택했다.
+
+시스템 구조는 다음과 같이 작동한다:
+- **에이전트 노드 (Agent Node)**: 사용자의 메시지와 이전 대화 문맥(Context History)을 바탕으로 GPT-4 등이 어떤 도구(Tools)를 호출할지 결정한다.
+- **도구 실행 노드 (Tools Node)**:
+  - `search_paper_chunks_tool`: 키워드를 바탕으로 논문의 본문 청크에서 근거를 검색한다.
+  - `get_trending_papers_tool`: 최신/인기 논문 DB 통계를 조회한다.
+- **조건부 엣지 (Conditional Edges)**: 도구가 여러 번 필요하면 에이전트와 도구를 왔다 갔다 하며 다단계 의사결정을 수행한다(React 기반).
+
+이 모든 응답 과정은 `stream_mode="messages"`를 활용하여 실시간 타이핑(스트리밍) 형태로 프론트엔드로 전달된다.
+
+## 9. `PaperDetailDocument` 계약
 
 논문 상세 문서의 공용 계약은 `PaperDetailDocument`다.
 
@@ -281,7 +294,7 @@ LangSmith는 단계별 trace를 남기는 데 사용한다. 현재 기준 핵심
 - `paper_overview`
 - `paper_key_findings`
 - `translation`
-- `detailed_summary`
+- `summary`
 - `rag_answer`
 
 운영 점검용 아티팩트도 함께 존재한다.
@@ -289,24 +302,14 @@ LangSmith는 단계별 trace를 남기는 데 사용한다. 현재 기준 핵심
 - `notebooks/retrieval_inspection.ipynb`
   - 적재 상태, queue 상태, retrieval 결과를 직접 확인하는 notebook
 
-## 10. 현재 단계에서 이미 반영된 것과 남은 것
+## 10. 구현된 아키텍처 요약
 
-현재 아키텍처 기준으로 이미 반영된 것은 다음과 같다.
+현재 아키텍처를 구성하는 핵심 컴포넌트는 다음과 같다.
 
-- raw 수집과 backfill
-- metadata enrichment
-- prepare queue
-- 로컬 prepare worker
-- HURIDOCS + fallback parser
-- fulltext, chunk, embedding 적재
-- lexical/vector/hybrid retrieval 기본형
-
-현재 남은 핵심 구현은 다음과 같다.
-
-- retrieval 고도화와 평가셋 정교화
-- answer chain과 citation 정책
-- 한국어 번역과 상세 요약 규칙
-- 논문 상세 문서 생성 품질과 평가 루프
-- Streamlit 소비 계층 완성
-
-즉 지금의 아키텍처 병목은 더 이상 "기반 파이프라인이 존재하지 않는다"가 아니라, "준비된 검색/적재 기반을 어떻게 더 좋은 사용자 경험으로 연결할 것인가"에 있다.
+- raw 수집과 backfill 및 metadata enrichment
+- prepare queue와 로컬 prepare worker의 연계
+- HURIDOCS + fallback parser에 의한 PDF 전문/청크 추출
+- PostgreSQL + pgvector를 활용한 fulltext, chunk, embedding 적재
+- lexical/vector/hybrid retrieval 파이프라인
+- LangGraph React Agent 기반 에이전틱 챗봇 (문맥 유지 및 스트리밍 응답 지원)
+- Streamlit Modular UI (Views, Components 라우팅 분리) 및 메인 그리드 페이징

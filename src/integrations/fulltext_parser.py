@@ -1,5 +1,3 @@
-"""PDF 본문 파싱과 청크 생성을 담당하는 모듈"""
-
 from __future__ import annotations
 
 import io

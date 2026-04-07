@@ -1,5 +1,3 @@
-"""논문 원본 수집 파이프라인을 담당하는 모듈"""
-
 from __future__ import annotations
 
 from datetime import date as date_cls, timedelta

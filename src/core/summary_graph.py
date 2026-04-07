@@ -1,5 +1,3 @@
-"""LangGraph 기반 상세 요약 워크플로우."""
-
 from __future__ import annotations
 
 from functools import lru_cache
@@ -11,15 +9,15 @@ from langgraph.graph import END, START, StateGraph
 
 from src.shared import get_settings
 
-from .prompts import DETAILED_SUMMARY_BUCKET_PROMPT, DETAILED_SUMMARY_PROMPT, DETAILED_SUMMARY_SECTION_PROMPT
-from .tracing import build_detailed_summary_trace_config
+from .prompts import SUMMARY_BUCKET_PROMPT, SUMMARY_PROMPT, SUMMARY_SECTION_PROMPT
+from .tracing import build_summary_trace_config
 
 _FALLBACK_TEXT_MAX_CHARS = 12000
 _SECTION_TEXT_MAX_CHARS = 3200
 _MERGED_SUMMARY_MAX_CHARS = 22000
 
 
-class DetailedSummaryGraphState(TypedDict, total=False):
+class SummaryGraphState(TypedDict, total=False):
     title: str
     authors: str
     sections: list[dict[str, Any]]
@@ -162,12 +160,12 @@ def _summarize_bucket(
     if not sections:
         return ""
 
-    config = build_detailed_summary_trace_config(
+    config = build_summary_trace_config(
         runtime=runtime,
         user=user,
         quality_score=quality_score,
     )
-    section_chain = DETAILED_SUMMARY_SECTION_PROMPT | _build_llm(temperature=0.1) | StrOutputParser()
+    section_chain = SUMMARY_SECTION_PROMPT | _build_llm(temperature=0.1) | StrOutputParser()
     per_section_summaries: list[str] = []
     for index, section in enumerate(sections, 1):
         section_title = str(section.get("title") or f"Section {index}").strip() or f"Section {index}"
@@ -191,7 +189,7 @@ def _summarize_bucket(
     if not per_section_summaries:
         return ""
 
-    bucket_chain = DETAILED_SUMMARY_BUCKET_PROMPT | _build_llm(temperature=0.15) | StrOutputParser()
+    bucket_chain = SUMMARY_BUCKET_PROMPT | _build_llm(temperature=0.15) | StrOutputParser()
     return bucket_chain.invoke(
         {
             "title": title or "제목 없음",
@@ -202,7 +200,7 @@ def _summarize_bucket(
     )
 
 
-def _normalize_input(state: DetailedSummaryGraphState) -> DetailedSummaryGraphState:
+def _normalize_input(state: SummaryGraphState) -> SummaryGraphState:
     normalized_sections = [section for section in state.get("sections", []) if isinstance(section, dict)]
     return {
         "title": state["title"],
@@ -217,7 +215,7 @@ def _normalize_input(state: DetailedSummaryGraphState) -> DetailedSummaryGraphSt
     }
 
 
-def _select_sections_node(state: DetailedSummaryGraphState) -> dict[str, Any]:
+def _select_sections_node(state: SummaryGraphState) -> dict[str, Any]:
     selected_sections = _select_sections(state.get("sections", []))
     return {
         "selected_sections": selected_sections,
@@ -225,7 +223,7 @@ def _select_sections_node(state: DetailedSummaryGraphState) -> dict[str, Any]:
     }
 
 
-def _summarize_background_node(state: DetailedSummaryGraphState) -> dict[str, str]:
+def _summarize_background_node(state: SummaryGraphState) -> dict[str, str]:
     return {
         "background_summary": _summarize_bucket(
             title=state["title"],
@@ -238,7 +236,7 @@ def _summarize_background_node(state: DetailedSummaryGraphState) -> dict[str, st
     }
 
 
-def _summarize_method_node(state: DetailedSummaryGraphState) -> dict[str, str]:
+def _summarize_method_node(state: SummaryGraphState) -> dict[str, str]:
     return {
         "method_summary": _summarize_bucket(
             title=state["title"],
@@ -251,7 +249,7 @@ def _summarize_method_node(state: DetailedSummaryGraphState) -> dict[str, str]:
     }
 
 
-def _summarize_experiments_node(state: DetailedSummaryGraphState) -> dict[str, str]:
+def _summarize_experiments_node(state: SummaryGraphState) -> dict[str, str]:
     return {
         "experiments_summary": _summarize_bucket(
             title=state["title"],
@@ -264,7 +262,7 @@ def _summarize_experiments_node(state: DetailedSummaryGraphState) -> dict[str, s
     }
 
 
-def _summarize_limitations_node(state: DetailedSummaryGraphState) -> dict[str, str]:
+def _summarize_limitations_node(state: SummaryGraphState) -> dict[str, str]:
     return {
         "limitations_summary": _summarize_bucket(
             title=state["title"],
@@ -277,7 +275,7 @@ def _summarize_limitations_node(state: DetailedSummaryGraphState) -> dict[str, s
     }
 
 
-def _merge_section_summaries_node(state: DetailedSummaryGraphState) -> dict[str, str]:
+def _merge_section_summaries_node(state: SummaryGraphState) -> dict[str, str]:
     parts: list[str] = []
     mapping = (
         ("background_summary", "배경/문제", "background"),
@@ -302,13 +300,13 @@ def _merge_section_summaries_node(state: DetailedSummaryGraphState) -> dict[str,
     return {"merged_section_summaries": _truncate(merged, _MERGED_SUMMARY_MAX_CHARS)}
 
 
-def _generate_detailed_summary_node(state: DetailedSummaryGraphState) -> dict[str, str]:
+def _generate_summary_node(state: SummaryGraphState) -> dict[str, str]:
     source_text = state.get("merged_section_summaries") or state.get("fallback_text") or ""
     if not source_text:
         return {"final_summary": ""}
 
-    chain = DETAILED_SUMMARY_PROMPT | _build_llm(temperature=0.2) | StrOutputParser()
-    config = build_detailed_summary_trace_config(
+    chain = SUMMARY_PROMPT | _build_llm(temperature=0.2) | StrOutputParser()
+    config = build_summary_trace_config(
         runtime=state["runtime"],
         user=state.get("user"),
         quality_score=state.get("quality_score"),
@@ -326,7 +324,7 @@ def _generate_detailed_summary_node(state: DetailedSummaryGraphState) -> dict[st
 
 @lru_cache(maxsize=1)
 def _build_graph():
-    graph = StateGraph(DetailedSummaryGraphState)
+    graph = StateGraph(SummaryGraphState)
     graph.add_node("normalize_input", _normalize_input)
     graph.add_node("select_sections", _select_sections_node)
     graph.add_node("summarize_background", _summarize_background_node)
@@ -334,7 +332,7 @@ def _build_graph():
     graph.add_node("summarize_experiments", _summarize_experiments_node)
     graph.add_node("summarize_limitations", _summarize_limitations_node)
     graph.add_node("merge_section_summaries", _merge_section_summaries_node)
-    graph.add_node("generate_detailed_summary", _generate_detailed_summary_node)
+    graph.add_node("generate_summary", _generate_summary_node)
 
     graph.add_edge(START, "normalize_input")
     graph.add_edge("normalize_input", "select_sections")
@@ -346,12 +344,12 @@ def _build_graph():
     graph.add_edge("summarize_method", "merge_section_summaries")
     graph.add_edge("summarize_experiments", "merge_section_summaries")
     graph.add_edge("summarize_limitations", "merge_section_summaries")
-    graph.add_edge("merge_section_summaries", "generate_detailed_summary")
-    graph.add_edge("generate_detailed_summary", END)
+    graph.add_edge("merge_section_summaries", "generate_summary")
+    graph.add_edge("generate_summary", END)
     return graph.compile()
 
 
-def generate_detailed_summary_via_graph(
+def generate_summary_via_graph(
     *,
     title: str,
     authors: str,

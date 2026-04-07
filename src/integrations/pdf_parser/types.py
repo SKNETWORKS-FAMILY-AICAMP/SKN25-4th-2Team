@@ -1,5 +1,3 @@
-"""PDF 파싱 결과 타입을 정의하는 모듈"""
-
 from dataclasses import dataclass, field
 from typing import Any
 

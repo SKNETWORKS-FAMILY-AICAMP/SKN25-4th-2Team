@@ -1,5 +1,3 @@
-"""논문 원본 응답 저장과 조회를 담당하는 모듈"""
-
 from __future__ import annotations
 
 from datetime import datetime, timezone

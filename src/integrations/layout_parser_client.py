@@ -1,5 +1,3 @@
-"""HURIDOCS PDF 레이아웃 파서 연동을 담당하는 모듈"""
-
 from __future__ import annotations
 
 from typing import Any

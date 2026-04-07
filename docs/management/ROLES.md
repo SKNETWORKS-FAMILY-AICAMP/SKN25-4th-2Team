@@ -180,7 +180,7 @@ answer payload는 최소한 아래 정보를 포함해야 한다.
 #### 소유 모듈
 
 - `src/core/prompts/translation.py`
-- `src/core/prompts/detailed_summary.py`
+- `src/core/prompts/summary.py`
 - `src/core/translation_chains.py`
 
 #### 책임 범위

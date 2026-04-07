@@ -1,5 +1,3 @@
-"""논문 분석 체인의 LangSmith trace 구성을 생성하는 모듈"""
-
 from typing import Any, Dict, Optional
 from src.shared import build_langsmith_trace_context
 
@@ -41,11 +39,12 @@ def build_analysis_trace_config(
     # 입력값 검증
     valid_stages = {
         "translation",
-        "detailed_summary",
+        "summary",
         "analyze_paper_detail",
         "paper_overview",
         "paper_key_findings",
         "paper_detail_document",
+        "rag_answer",
     }
     if stage not in valid_stages:
         raise ValueError(f"stage는 {valid_stages} 중 하나여야 합니다. 받은 값: {stage}")
@@ -128,15 +127,30 @@ def build_translation_trace_config(
     )
 
 
-def build_detailed_summary_trace_config(
+def build_summary_trace_config(
     *,
     runtime: str = "dev",
     user: Optional[str] = None,
     quality_score: Optional[float] = None,
 ) -> Dict[str, Any]:
     return build_analysis_trace_config(
-        stage="detailed_summary",
+        stage="summary",
         runtime=runtime,
         user=user,
         quality_score=quality_score,
     )
+
+
+def build_rag_answer_trace_config(
+    *,
+    runtime: str = "dev",
+    user: Optional[str] = None,
+    quality_score: Optional[float] = None,
+) -> Dict[str, Any]:
+    return build_analysis_trace_config(
+        stage="rag_answer",
+        runtime=runtime,
+        user=user,
+        quality_score=quality_score,
+    )
+

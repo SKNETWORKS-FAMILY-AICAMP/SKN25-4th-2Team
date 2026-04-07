@@ -1,5 +1,3 @@
-"""파이프라인 실행 함수들의 공개 인터페이스를 모아 노출하는 모듈"""
-
 from .collect_papers import run_backfill_collect_papers, run_collect_papers
 from .enrich_papers_metadata import run_enrich_papers_metadata
 from .embed_papers import run_embed_papers

@@ -1,5 +1,3 @@
-"""OpenAI 기반 임베딩 생성을 담당하는 모듈"""
-
 from __future__ import annotations
 
 from collections.abc import Sequence

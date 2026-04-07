@@ -1,6 +1,6 @@
 """논문 청크(chunk) 단위 한국어 번역 프롬프트
 
-RAG 근거 chunk 번역 전용. 논문 전체 요약은 detailed_summary.py를 사용한다.
+RAG 근거 chunk 번역 전용. 논문 전체 요약은 summary.py를 사용한다.
 """
 
 from langchain_core.prompts import ChatPromptTemplate
