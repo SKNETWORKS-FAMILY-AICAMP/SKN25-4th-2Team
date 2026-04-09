@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>ArXplore Papers</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #212529;
+            padding: 40px 20px;
+        }
+
+        .container { max-width: 1100px; margin: 0 auto; }
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        header h1 { font-size: 2rem; margin-bottom: 8px; }
+        header p { color: #888; font-size: 1rem; }
+
+        /* 검색 & 정렬 */
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 28px;
+            flex-wrap: wrap;
+        }
+        .controls input[type="text"] {
+            width: 360px;
+            padding: 10px 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.95rem;
+        }
+        .controls select {
+            padding: 10px 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            background: white;
+        }
+        .controls button {
+            padding: 10px 20px;
+            background: #4c6ef5;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            cursor: pointer;
+        }
+        .controls button:hover { background: #3b5bdb; }
+
+        /* 논문 카드 그리드 */
+        .paper-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        @media (max-width: 900px) { .paper-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 600px) { .paper-grid { grid-template-columns: 1fr; } }
+
+        .paper-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            height: 280px;
+            cursor: pointer;
+            transition: box-shadow 0.2s, border-color 0.2s;
+        }
+        .paper-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-color: #4c6ef5;
+        }
+
+        .paper-title {
+            font-size: 0.92rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        .paper-title a { color: #212529; text-decoration: none; }
+        .paper-title a:hover { color: #4c6ef5; text-decoration: underline; }
+
+        .paper-abstract {
+            font-size: 0.83rem;
+            color: #555;
+            line-height: 1.5;
+            overflow: hidden;
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            flex: 1;
+            margin-bottom: 10px;
+        }
+
+        .paper-meta {
+            font-size: 0.78rem;
+            color: #888;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 12px;
+        }
+
+        /* 페이지네이션 */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .pagination a, .pagination span {
+            padding: 8px 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #212529;
+            font-size: 0.9rem;
+            background: white;
+        }
+        .pagination a:hover { background: #4c6ef5; color: white; border-color: #4c6ef5; }
+        .pagination .page-info { color: #888; border: none; background: transparent; padding: 8px 6px; }
+        .pagination .disabled { color: #ccc; pointer-events: none; }
+
+        .no-papers {
+            text-align: center;
+            padding: 60px 0;
+            color: #888;
+            font-size: 1rem;
+        }
+
+        .result-count {
+            text-align: center;
+            color: #888;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <header>
+        <h1>ArXplore Papers</h1>
+        <p>HF Daily Papers & arXiv 기반 최신 AI 논문 탐색 플랫폼</p>
+    </header>
+
+    <!-- 검색 & 정렬 폼 -->
+    <form method="get" class="controls">
+        <input type="text" name="q" value="{{ query }}" placeholder="논문 제목 또는 초록 검색...">
+        <select name="sort">
+            <option value="latest" {% if sort == 'latest' %}selected{% endif %}>최신순 (Latest)</option>
+            <option value="upvotes" {% if sort == 'upvotes' %}selected{% endif %}>추천순 (Upvotes)</option>
+        </select>
+        <button type="submit">검색</button>
+    </form>
+
+    {% if error %}
+        <div class="no-papers" style="color:#d63031;">{{ error }}</div>
+    {% elif not page_obj or page_obj.paginator.count == 0 %}
+        <div class="no-papers">수집된 논문이 없습니다.</div>
+    {% else %}
+        <p class="result-count">총 {{ page_obj.paginator.count }}개 논문 — {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 페이지</p>
+
+        <div class="paper-grid">
+            {% for paper in page_obj %}
+            <div class="paper-card" onclick="location.href='/papers/{{ paper.arxiv_id }}/'">
+                <div class="paper-title">
+                    <a href="{{ paper.pdf_url }}" target="_blank" onclick="event.stopPropagation()">
+                        {{ paper.title|truncatechars:65 }}
+                    </a>
+                </div>
+                <div class="paper-abstract">{{ paper.abstract|truncatechars:200 }}</div>
+                <div class="paper-meta">
+                    {{ paper.authors|join:", "|truncatechars:40 }}<br>
+                    📅 {{ paper.published_at|slice:":10" }} &nbsp;•&nbsp; ❤️ {{ paper.upvotes|default:0 }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 페이지네이션 -->
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+                <a href="?q={{ query }}&sort={{ sort }}&page={{ page_obj.previous_page_number|add:'-9' }}">&laquo;</a>
+                <a href="?q={{ query }}&sort={{ sort }}&page={{ page_obj.previous_page_number }}">&lsaquo;</a>
+            {% else %}
+                <span class="disabled">&laquo;</span>
+                <span class="disabled">&lsaquo;</span>
+            {% endif %}
+
+            <span class="page-info">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+
+            {% if page_obj.has_next %}
+                <a href="?q={{ query }}&sort={{ sort }}&page={{ page_obj.next_page_number }}">&rsaquo;</a>
+                <a href="?q={{ query }}&sort={{ sort }}&page={{ page_obj.next_page_number|add:'9' }}">&raquo;</a>
+            {% else %}
+                <span class="disabled">&rsaquo;</span>
+                <span class="disabled">&raquo;</span>
+            {% endif %}
+        </div>
+    {% endif %}
+
+</div>
+</body>
+</html>

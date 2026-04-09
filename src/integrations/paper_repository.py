@@ -698,6 +698,89 @@ class PaperRepository:
                     ON paper_chunks USING GIN (to_tsvector('english', chunk_text));
                 """
             )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS paper_ai_summaries (
+                    arxiv_id TEXT PRIMARY KEY REFERENCES papers(arxiv_id) ON DELETE CASCADE,
+                    overview TEXT,
+                    key_findings JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    overview_model TEXT,
+                    overview_generated_at TIMESTAMPTZ,
+                    detailed_summary TEXT,
+                    summary_model TEXT,
+                    summary_generated_at TIMESTAMPTZ
+                );
+                """
+            )
+
+    def get_paper_ai_summary(self, arxiv_id: str) -> dict[str, Any] | None:
+        """AI 분석 캐시를 조회한다. 미생성 시 None 반환."""
+        with self._connection() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT overview, key_findings, overview_model, overview_generated_at,
+                       detailed_summary, summary_model, summary_generated_at
+                FROM paper_ai_summaries
+                WHERE arxiv_id = %s
+                """,
+                (arxiv_id,),
+            )
+            row = cursor.fetchone()
+
+        if row is None:
+            return None
+
+        return {
+            "overview": row[0],
+            "key_findings": row[1] or [],
+            "overview_model": row[2],
+            "overview_generated_at": row[3].isoformat() if row[3] else None,
+            "detailed_summary": row[4],
+            "summary_model": row[5],
+            "summary_generated_at": row[6].isoformat() if row[6] else None,
+        }
+
+    def upsert_overview(
+        self,
+        arxiv_id: str,
+        overview: str,
+        key_findings: list[str],
+        model_name: str,
+    ) -> None:
+        """overview / key_findings를 저장한다. detailed_summary 컬럼은 변경하지 않는다."""
+        with self._connection() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO paper_ai_summaries (arxiv_id, overview, key_findings, overview_model, overview_generated_at)
+                VALUES (%s, %s, %s, %s, NOW())
+                ON CONFLICT (arxiv_id) DO UPDATE SET
+                    overview = EXCLUDED.overview,
+                    key_findings = EXCLUDED.key_findings,
+                    overview_model = EXCLUDED.overview_model,
+                    overview_generated_at = NOW()
+                """,
+                (arxiv_id, overview, Json(key_findings), model_name),
+            )
+
+    def upsert_detailed_summary(
+        self,
+        arxiv_id: str,
+        summary: str,
+        model_name: str,
+    ) -> None:
+        """detailed_summary를 저장한다. overview 컬럼은 변경하지 않는다."""
+        with self._connection() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO paper_ai_summaries (arxiv_id, detailed_summary, summary_model, summary_generated_at)
+                VALUES (%s, %s, %s, NOW())
+                ON CONFLICT (arxiv_id) DO UPDATE SET
+                    detailed_summary = EXCLUDED.detailed_summary,
+                    summary_model = EXCLUDED.summary_model,
+                    summary_generated_at = NOW()
+                """,
+                (arxiv_id, summary, model_name),
+            )
 
     def _build_postgres_connection_params(self) -> dict[str, Any]:
         host = self.settings.postgres_host
