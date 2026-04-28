@@ -273,7 +273,7 @@
 }
 
 .list-page .paper-abstract-wrapper::after {
-  content: "ArXplore 경험하기";
+  content: "ArXplore로 분석하기";
   position: absolute;
   inset: 0;
   background: rgba(50, 50, 55, 0.78);
