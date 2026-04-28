@@ -9,12 +9,22 @@ interface AssistantChatHistoryProps {
   streamingContent?: string;
 }
 
+function handleChatLinkClick(event: React.MouseEvent<HTMLDivElement>) {
+  const target = event.target as HTMLElement;
+  const anchor = target.closest("a");
+  if (!anchor) return;
+  const href = anchor.getAttribute("href");
+  if (!href) return;
+  event.preventDefault();
+  window.open(href, "_blank", "noopener,noreferrer");
+}
+
 export const AssistantChatHistory = forwardRef<
   HTMLDivElement,
   AssistantChatHistoryProps
 >(function AssistantChatHistory({ messages, isSending, streamingContent }, ref) {
   return (
-    <div className="assistant-chat-history" id="assistant-chat-history" ref={ref}>
+    <div className="assistant-chat-history" id="assistant-chat-history" ref={ref} onClick={handleChatLinkClick}>
       {messages.map((message, index) => {
         if (message.role === "assistant") {
           return (

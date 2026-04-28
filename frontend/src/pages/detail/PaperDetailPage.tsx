@@ -254,6 +254,16 @@ export function PaperDetailPage({
       <div className="detail-page">
         <div className="page-error-wrap">
           <div className="error-box">{pageError}</div>
+          {arxivId ? (
+            <a
+              href={`https://arxiv.org/abs/${arxivId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="arxiv-fallback-btn"
+            >
+              arXiv에서 보기 ↗
+            </a>
+          ) : null}
         </div>
       </div>
     );
