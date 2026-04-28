@@ -73,6 +73,35 @@ class PaperSearchClient:
 
         return results
 
+    def search_arxiv_papers(self, query: str, *, max_results: int = 5) -> list[dict[str, Any]]:
+        """arXiv API에서 관련 논문 후보를 검색한다."""
+        normalized_query = " ".join(query.split())
+        if not normalized_query:
+            return []
+
+        search_terms = [
+            f'all:"{term}"'
+            for term in normalized_query.split()[:8]
+            if term.strip()
+        ]
+        if not search_terms:
+            return []
+
+        response = self._get_with_retries(
+            self.settings.arxiv_api_base_url,
+            params={
+                "search_query": " AND ".join(search_terms),
+                "start": 0,
+                "max_results": max(1, int(max_results)),
+                "sortBy": "relevance",
+                "sortOrder": "descending",
+            },
+            timeout=min(self.settings.arxiv_request_timeout_seconds, 8),
+            retry_count=1,
+            retry_delay_seconds=max(1.0, float(self.settings.arxiv_request_delay_seconds)),
+        )
+        return list(self._parse_arxiv_feed(response.text).values())
+
     def _get_with_retries(
         self,
         url: str,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+import re
 from typing import Any
 
 from django.contrib.auth import authenticate, get_user_model, login, logout
@@ -16,6 +17,8 @@ from .models import DEFAULT_SUMMARY_MODEL, FavoritePaper, UserSettings
 MAX_RECENT_PAPERS = 1500
 PAPERS_PER_PAGE = 21
 PAPER_CHUNK_LIMIT = 20
+RELATED_PAPER_LIMIT = 5
+RELATED_PAPER_CANDIDATE_LIMIT = 300
 VALID_SEARCH_MODES = {"search", "ai"}
 SESSION_API_KEY_KEY = "personal_openai_api_key"
 OVERVIEW_MODEL = "gpt-5-mini"
@@ -81,9 +84,20 @@ def build_paper_list_payload(*, query: str, sort: str, mode: str, page: Any, use
 
 def build_paper_detail_payload(arxiv_id: str, *, user: AbstractBaseUser | AnonymousUser) -> dict[str, Any]:
     _require_authenticated_user(user)
-    favorite_ids = _get_favorite_ids(user, [arxiv_id])
+    paper = _get_paper_or_raise(arxiv_id)
+    related_papers = _build_related_papers(paper)
+    favorite_ids = _get_favorite_ids(
+        user,
+        [paper.get("arxiv_id"), *(related_paper.get("arxiv_id") for related_paper in related_papers)],
+    )
     return {
-        "paper": _serialize_paper_for_detail(_get_paper_or_raise(arxiv_id), favorite_ids=favorite_ids),
+        "paper": {
+            **_serialize_paper_for_detail(paper, favorite_ids=favorite_ids),
+            "related_papers": [
+                _serialize_related_paper(related_paper, favorite_ids=favorite_ids)
+                for related_paper in related_papers
+            ],
+        },
     }
 
 
@@ -481,3 +495,138 @@ def _serialize_paper_for_list(paper: dict[str, Any], *, favorite_ids: set[str]) 
 
 def _serialize_paper_for_detail(paper: dict[str, Any], *, favorite_ids: set[str]) -> dict[str, Any]:
     return _serialize_paper_for_list(paper, favorite_ids=favorite_ids)
+
+
+def _serialize_related_paper(paper: dict[str, Any], *, favorite_ids: set[str]) -> dict[str, Any]:
+    serialized = _serialize_paper_for_list(paper, favorite_ids=favorite_ids)
+    serialized["source"] = paper.get("source") or "local"
+    serialized["relation_score"] = round(float(paper.get("relation_score") or 0), 3)
+    return serialized
+
+
+def _build_related_papers(paper: dict[str, Any], *, limit: int = RELATED_PAPER_LIMIT) -> list[dict[str, Any]]:
+    repo = get_paper_repository()
+    current_id = str(paper.get("arxiv_id") or "")
+    seen_ids = {current_id}
+    related: list[dict[str, Any]] = []
+
+    for candidate in repo.list_recent_papers(limit=RELATED_PAPER_CANDIDATE_LIMIT):
+        candidate_id = str(candidate.get("arxiv_id") or "")
+        if not candidate_id or candidate_id in seen_ids:
+            continue
+        score = _score_related_paper(paper, candidate)
+        if score <= 0:
+            continue
+        related_candidate = dict(candidate)
+        related_candidate["relation_score"] = score
+        related_candidate["source"] = "local"
+        related.append(related_candidate)
+        seen_ids.add(candidate_id)
+
+    related.sort(
+        key=lambda item: (
+            float(item.get("relation_score") or 0),
+            int(item.get("upvotes") or 0),
+            str(item.get("published_at") or ""),
+        ),
+        reverse=True,
+    )
+
+    if len(related) < limit:
+        related.extend(
+            _search_external_related_papers(
+                paper,
+                seen_ids=seen_ids,
+                limit=limit - len(related),
+            )
+        )
+
+    return related[:limit]
+
+
+def _score_related_paper(source: dict[str, Any], candidate: dict[str, Any]) -> float:
+    source_categories = set(source.get("categories") or [])
+    candidate_categories = set(candidate.get("categories") or [])
+    category_overlap = len(source_categories & candidate_categories)
+    same_primary = source.get("primary_category") and source.get("primary_category") == candidate.get("primary_category")
+
+    source_title_tokens = _keyword_tokens(source.get("title") or "")
+    candidate_title_tokens = _keyword_tokens(candidate.get("title") or "")
+    source_abstract_tokens = _keyword_tokens(source.get("abstract") or "")
+    candidate_abstract_tokens = _keyword_tokens(candidate.get("abstract") or "")
+
+    title_overlap = len(source_title_tokens & candidate_title_tokens)
+    abstract_overlap = len(source_abstract_tokens & candidate_abstract_tokens)
+
+    return (
+        category_overlap * 2.0
+        + (1.5 if same_primary else 0.0)
+        + title_overlap * 0.8
+        + min(abstract_overlap, 12) * 0.12
+    )
+
+
+def _search_external_related_papers(
+    paper: dict[str, Any],
+    *,
+    seen_ids: set[str],
+    limit: int,
+) -> list[dict[str, Any]]:
+    if limit <= 0:
+        return []
+    try:
+        from src.integrations.paper_search import PaperSearchClient
+
+        client = PaperSearchClient()
+        query = " ".join(_keyword_tokens_in_order(paper.get("title") or "")[:8])
+        if not query:
+            return []
+        external_papers = client.search_arxiv_papers(query, max_results=max(limit * 2, 5))
+    except Exception:
+        return []
+
+    related: list[dict[str, Any]] = []
+    for external_paper in external_papers:
+        arxiv_id = str(external_paper.get("arxiv_id") or "")
+        if not arxiv_id or arxiv_id in seen_ids:
+            continue
+        external_paper["source"] = "arxiv"
+        external_paper["relation_score"] = _score_related_paper(paper, external_paper)
+        related.append(external_paper)
+        seen_ids.add(arxiv_id)
+        if len(related) >= limit:
+            break
+    return related
+
+
+def _keyword_tokens(text: str) -> set[str]:
+    return set(_keyword_tokens_in_order(text))
+
+
+def _keyword_tokens_in_order(text: str) -> list[str]:
+    stopwords = {
+        "about",
+        "after",
+        "based",
+        "between",
+        "from",
+        "into",
+        "model",
+        "models",
+        "paper",
+        "that",
+        "the",
+        "their",
+        "this",
+        "through",
+        "using",
+        "with",
+    }
+    tokens: list[str] = []
+    seen: set[str] = set()
+    for token in re.findall(r"[a-zA-Z][a-zA-Z0-9-]{2,}", text.lower()):
+        if token in stopwords or token in seen:
+            continue
+        tokens.append(token)
+        seen.add(token)
+    return tokens

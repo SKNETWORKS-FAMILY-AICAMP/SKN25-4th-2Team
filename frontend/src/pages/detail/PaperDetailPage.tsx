@@ -13,6 +13,7 @@ import { ChatPanel } from "../../components/detail/ChatPanel";
 import { DetailTopBar } from "../../components/detail/DetailTopBar";
 import { PaperHeroCard } from "../../components/detail/PaperHeroCard";
 import { PdfPanel } from "../../components/detail/PdfPanel";
+import { RelatedPapersCard } from "../../components/detail/RelatedPapersCard";
 import {
   fetchPaperAnalysis,
   fetchPaperDetail,
@@ -360,6 +361,12 @@ export function PaperDetailPage({
           )}
         </div>
       </div>
+
+      {paper.related_papers && paper.related_papers.length > 0 ? (
+        <div className="detail-bottom-section">
+          <RelatedPapersCard papers={paper.related_papers} />
+        </div>
+      ) : null}
 
       {canUseAi ? <ChatPanel arxivId={paper.arxiv_id} /> : null}
     </div>

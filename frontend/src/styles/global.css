@@ -222,7 +222,14 @@ a {
 }
 
 .settings-section h3 {
-  margin: 0 0 8px;
+  margin: 0;
+}
+
+.settings-section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 
 .settings-help {
@@ -257,11 +264,6 @@ a {
 .paper-favorite-btn {
   padding: 10px 14px;
   font-weight: 700;
-}
-
-.settings-chip-row {
-  display: flex;
-  margin-top: 12px;
 }
 
 .status-chip {

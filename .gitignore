@@ -7,6 +7,7 @@ build/
 .env
 node_modules/
 frontend/node_modules/
+frontend/.vite/
 *.tsbuildinfo
 notebooks/
 .ipynb_checkpoints/
@@ -25,6 +26,7 @@ Thumbs.db
 web/db.sqlite3
 web/staticfiles/
 docs/tmp/
+
 
 tests/
 prepare_*.log

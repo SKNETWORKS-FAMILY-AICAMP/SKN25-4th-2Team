@@ -141,7 +141,12 @@ export function SettingsPanel({
         {activeTab === "settings" ? (
           <div className="settings-section-stack">
             <section className="settings-section">
-              <h3>세션 API 키</h3>
+              <div className="settings-section-title-row">
+                <h3>세션 API 키</h3>
+                <span className={session.has_personal_api_key ? "status-chip active" : "status-chip"}>
+                  {session.has_personal_api_key ? "등록됨" : "미등록"}
+                </span>
+              </div>
               <p className="settings-help">
                 API 키는 현재 로그인 세션 동안에만 서버에 저장됩니다.
               </p>
@@ -158,11 +163,6 @@ export function SettingsPanel({
                 <button type="button" onClick={() => void handleClearApiKey()} disabled={isBusy}>
                   삭제
                 </button>
-              </div>
-              <div className="settings-chip-row">
-                <span className={session.has_personal_api_key ? "status-chip active" : "status-chip"}>
-                  {session.has_personal_api_key ? "등록됨" : "미등록"}
-                </span>
               </div>
             </section>
 

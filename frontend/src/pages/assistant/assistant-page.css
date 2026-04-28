@@ -142,16 +142,22 @@
   border-radius: 999px;
   background: #2f343b;
   color: #fff;
-  width: 46px;
+  width: 60px;
+  min-width: 60px;
   height: 46px;
   flex-shrink: 0;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
+  line-height: 1;
   font-size: 0.92rem;
   font-weight: 700;
   cursor: pointer;
+}
+
+.assistant-composer button svg {
+  display: block;
 }
 
 .assistant-composer button:disabled {
@@ -161,7 +167,6 @@
 
 .assistant-composer .assistant-stop-btn {
   background: #dc2626;
-  min-width: 60px;
 }
 
 .assistant-composer .assistant-stop-btn:hover {
