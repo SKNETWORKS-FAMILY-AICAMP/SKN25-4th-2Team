@@ -153,6 +153,15 @@
   cursor: not-allowed;
 }
 
+.assistant-composer .assistant-stop-btn {
+  background: #dc2626;
+  min-width: 60px;
+}
+
+.assistant-composer .assistant-stop-btn:hover {
+  background: #b91c1c;
+}
+
 .assistant-notice {
   background: #f3f4f6;
   border: 1px solid #d1d5db;

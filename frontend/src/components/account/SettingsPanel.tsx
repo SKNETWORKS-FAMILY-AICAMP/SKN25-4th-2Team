@@ -34,10 +34,13 @@ export function SettingsPanel({
   const [statusMessage, setStatusMessage] = useState("");
   const [favorites, setFavorites] = useState<FavoriteListPayload["items"]>([]);
   const [favoritesError, setFavoritesError] = useState("");
+  const [isFavoritesLoading, setIsFavoritesLoading] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
 
   useEffect(() => {
     if (!open) {
+      setFavorites([]);
+      setFavoritesError("");
       return;
     }
     setActiveTab(initialTab);
@@ -46,16 +49,15 @@ export function SettingsPanel({
   }, [initialTab, open, session.preferred_summary_model]);
 
   useEffect(() => {
-    if (!open || activeTab !== "favorites" || !session.is_authenticated) {
+    if (!open || !session.is_authenticated) {
       return;
     }
 
     let active = true;
+    setIsFavoritesLoading(true);
     fetchFavorites()
       .then((payload) => {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         if (payload.error) {
           setFavoritesError(payload.error);
           return;
@@ -64,17 +66,18 @@ export function SettingsPanel({
         setFavoritesError("");
       })
       .catch((error) => {
-        if (!active) {
-          return;
-        }
+        if (!active) return;
         setFavorites([]);
         setFavoritesError(error instanceof Error ? error.message : "즐겨찾기를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (active) setIsFavoritesLoading(false);
       });
 
     return () => {
       active = false;
     };
-  }, [activeTab, open, session.is_authenticated]);
+  }, [open, session.is_authenticated]);
 
   if (!open) {
     return null;
@@ -206,7 +209,9 @@ export function SettingsPanel({
           <section className="settings-section">
             <h3>즐겨찾기</h3>
             {favoritesError ? <div className="settings-status error">{favoritesError}</div> : null}
-            {!favoritesError && favorites.length === 0 ? (
+            {isFavoritesLoading ? (
+              <div className="settings-help">불러오는 중...</div>
+            ) : !favoritesError && favorites.length === 0 ? (
               <div className="settings-help">즐겨찾기한 논문이 없습니다.</div>
             ) : (
               <div className="favorites-list">

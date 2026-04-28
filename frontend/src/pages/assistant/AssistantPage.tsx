@@ -4,22 +4,18 @@ import { AssistantChatHistory } from "../../components/assistant/AssistantChatHi
 import { AssistantComposer } from "../../components/assistant/AssistantComposer";
 import { AssistantHero } from "../../components/assistant/AssistantHero";
 import { AssistantNotice } from "../../components/assistant/AssistantNotice";
-import { postAssistantChat } from "../../helpers/assistant/assistantChatApi";
-import type {
-  AssistantChatMessage,
-  AssistantChatResponse,
-} from "../../types/assistant";
+import { streamAssistantChat } from "../../helpers/assistant/assistantChatApi";
+import type { AssistantChatMessage } from "../../types/assistant";
 import type { BootstrapPayload } from "../../types/app";
 import "./assistant-page.css";
 
 const INITIAL_ASSISTANT_MESSAGE =
   "찾고 싶은 연구 주제나 기술 키워드를 질문해 주세요.";
-const FALLBACK_ERROR_MESSAGE = "답변을 불러오는 중 오류가 발생했습니다.";
+const STREAM_ENDPOINT = "/papers/assistant/stream/";
 
 export interface AssistantPageProps {
   session: BootstrapPayload;
   initialQuery?: string;
-  assistantChatEndpoint?: string;
   homeHref?: string;
   onRequireLogin: () => void;
   onOpenSettings: () => void;
@@ -28,7 +24,6 @@ export interface AssistantPageProps {
 export function AssistantPage({
   session,
   initialQuery = "",
-  assistantChatEndpoint = "/papers/assistant/chat/",
   homeHref = "/",
   onRequireLogin,
   onOpenSettings,
@@ -39,69 +34,78 @@ export function AssistantPage({
   const [chatHistory, setChatHistory] = useState<AssistantChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [streamingContent, setStreamingContent] = useState("");
   const hasSubmittedInitialQueryRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const chatHistoryRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const canUseAssistant = session.is_authenticated && session.has_personal_api_key;
 
   const scrollToBottom = () => {
-    if (!chatHistoryRef.current) {
-      return;
-    }
+    if (!chatHistoryRef.current) return;
     chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight;
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isSending]);
+  }, [messages, isSending, streamingContent]);
+
+  const stopGeneration = () => {
+    abortControllerRef.current?.abort();
+  };
 
   const sendMessage = async (prefilledMessage = "") => {
-    if (!canUseAssistant || isSending) {
-      return;
-    }
+    if (!canUseAssistant || isSending) return;
 
     const message = (prefilledMessage || inputValue).trim();
-    if (!message) {
-      return;
-    }
+    if (!message) return;
 
     const requestHistory = chatHistory;
     const userMessage: AssistantChatMessage = { role: "user", content: message };
 
     setInputValue("");
     setIsSending(true);
-    setMessages((previous) => [...previous, userMessage]);
-    setChatHistory((previous) => [...previous, userMessage]);
+    setStreamingContent("");
+    setMessages((prev) => [...prev, userMessage]);
+    setChatHistory((prev) => [...prev, userMessage]);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    let accumulated = "";
 
     try {
-      const data: AssistantChatResponse = await postAssistantChat({
-        endpoint: assistantChatEndpoint,
+      await streamAssistantChat({
+        endpoint: STREAM_ENDPOINT,
         message,
         history: requestHistory,
+        signal: controller.signal,
+        onChunk: (chunk) => {
+          accumulated += chunk;
+          setStreamingContent(accumulated);
+        },
       });
-      const answer = data.error ? `오류: ${data.error}` : data.answer || "";
-      const assistantMessage: AssistantChatMessage = {
-        role: "assistant",
-        content: answer,
-      };
-      setMessages((previous) => [...previous, assistantMessage]);
-      setChatHistory((previous) => [...previous, assistantMessage]);
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        if (!accumulated) accumulated = "사용자의 요청으로 답변이 중단되었습니다.";
+      } else {
+        accumulated = accumulated || "답변을 불러오는 중 오류가 발생했습니다.";
+      }
+    } finally {
       const assistantMessage: AssistantChatMessage = {
         role: "assistant",
-        content: FALLBACK_ERROR_MESSAGE,
+        content: accumulated || "답변을 생성할 수 없습니다.",
       };
-      setMessages((previous) => [...previous, assistantMessage]);
-    } finally {
+      setMessages((prev) => [...prev, assistantMessage]);
+      setChatHistory((prev) => [...prev, assistantMessage]);
+      setStreamingContent("");
       setIsSending(false);
+      abortControllerRef.current = null;
       inputRef.current?.focus();
     }
   };
 
   useEffect(() => {
-    if (!canUseAssistant || !initialQuery.trim() || hasSubmittedInitialQueryRef.current) {
-      return;
-    }
+    if (!canUseAssistant || !initialQuery.trim() || hasSubmittedInitialQueryRef.current) return;
     hasSubmittedInitialQueryRef.current = true;
     void sendMessage(initialQuery.trim());
   }, [canUseAssistant, initialQuery]);
@@ -120,15 +124,20 @@ export function AssistantPage({
         )}
 
         <div className="assistant-chat-shell">
-          <AssistantChatHistory messages={messages} isSending={isSending} ref={chatHistoryRef} />
+          <AssistantChatHistory
+            messages={messages}
+            isSending={isSending}
+            streamingContent={streamingContent}
+            ref={chatHistoryRef}
+          />
           <AssistantComposer
             value={inputValue}
-            disabled={!canUseAssistant || isSending}
+            disabled={!canUseAssistant}
+            isSending={isSending}
             inputRef={inputRef}
             onChange={setInputValue}
-            onSend={() => {
-              void sendMessage();
-            }}
+            onSend={() => { void sendMessage(); }}
+            onStop={stopGeneration}
           />
         </div>
       </div>

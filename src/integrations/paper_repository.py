@@ -275,6 +275,41 @@ class PaperRepository:
             "citation_count": row[12],
         }
 
+    def list_papers_by_ids(self, arxiv_ids: list[str]) -> list[dict[str, Any]]:
+        if not arxiv_ids:
+            return []
+        with self._connection() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT arxiv_id, title, authors, abstract, primary_category, categories, pdf_url,
+                       published_at, updated_at, upvotes, github_url, github_stars, citation_count
+                FROM papers
+                WHERE arxiv_id = ANY(%s)
+                """,
+                (arxiv_ids,),
+            )
+            rows = cursor.fetchall()
+
+        paper_map = {
+            row[0]: {
+                "arxiv_id": row[0],
+                "title": row[1],
+                "authors": row[2] or [],
+                "abstract": row[3] or "",
+                "primary_category": row[4],
+                "categories": row[5] or [],
+                "pdf_url": row[6],
+                "published_at": row[7].isoformat() if row[7] else None,
+                "updated_at": row[8].isoformat() if row[8] else None,
+                "upvotes": row[9] or 0,
+                "github_url": row[10],
+                "github_stars": row[11],
+                "citation_count": row[12],
+            }
+            for row in rows
+        }
+        return [paper_map[arxiv_id] for arxiv_id in arxiv_ids if arxiv_id in paper_map]
+
     def get_paper_fulltext(self, arxiv_id: str) -> dict[str, Any] | None:
         """단일 논문의 fulltext와 섹션 정보를 조회한다."""
         with self._connection() as connection, connection.cursor() as cursor:

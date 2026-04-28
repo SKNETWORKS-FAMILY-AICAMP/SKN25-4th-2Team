@@ -115,17 +115,15 @@ def build_settings_payload(user: AbstractBaseUser | AnonymousUser) -> dict[str, 
 
 def build_favorites_payload(user: AbstractBaseUser | AnonymousUser) -> dict[str, Any]:
     _require_authenticated_user(user)
-    favorite_rows = list(
+    favorite_ids = list(
         FavoritePaper.objects.filter(user=user).order_by("-created_at").values_list("arxiv_id", flat=True)
     )
+    if not favorite_ids:
+        return {"items": []}
     repo = get_paper_repository()
-    items: list[dict[str, Any]] = []
-    for arxiv_id in favorite_rows:
-        paper = repo.get_paper(arxiv_id)
-        if not paper:
-            continue
-        items.append(_serialize_paper_for_list(paper, favorite_ids={arxiv_id}))
-    return {"items": items}
+    papers = repo.list_papers_by_ids(favorite_ids)
+    favorite_id_set = set(favorite_ids)
+    return {"items": [_serialize_paper_for_list(paper, favorite_ids=favorite_id_set) for paper in papers]}
 
 
 def save_personal_api_key(request: HttpRequest, api_key: str) -> dict[str, Any]:
@@ -376,6 +374,29 @@ def answer_agent_chat(
             user=user.get_username(),
         )
     return result.get("answer") or "답변을 생성할 수 없습니다."
+
+
+def stream_agent_chat(
+    user_message: str,
+    chat_history: list[dict[str, Any]],
+    *,
+    user: AbstractBaseUser | AnonymousUser,
+    session_api_key: str | None,
+):
+    _require_authenticated_user(user)
+    api_key = _require_personal_api_key(session_api_key)
+    cleaned_message = user_message.strip()
+    if not cleaned_message:
+        raise ValueError("메시지를 입력하세요.")
+
+    from src.core.agent.chatbot import stream_agent_search
+
+    with override_openai_runtime(api_key=api_key):
+        yield from stream_agent_search(
+            cleaned_message,
+            chat_history=_build_history_tuples(chat_history),
+            user=user.get_username(),
+        )
 
 
 def _get_paper_or_raise(arxiv_id: str) -> dict[str, Any]:

@@ -58,7 +58,7 @@ export function PaperCard({
     <article className="paper-card" onClick={handleCardClick}>
       <div className="paper-card-top">
         <div className="paper-title">
-          <a href={pdfLink} target="_blank" rel="noreferrer" onClick={handleTitleClick}>
+          <a href={pdfLink} target="_blank" rel="noreferrer" onClick={handleTitleClick} data-tooltip="논문원본 바로가기">
             {truncateText(paper.title, 65)}
           </a>
         </div>
@@ -83,7 +83,9 @@ export function PaperCard({
           </svg>
         </button>
       </div>
-      <div className="paper-abstract">{truncateText(paper.abstract, 200)}</div>
+      <div className="paper-abstract-wrapper">
+        <div className="paper-abstract">{truncateText(paper.abstract, 200)}</div>
+      </div>
       <div className="paper-meta paper-meta-row">
         <div className="paper-meta-item">
           <svg

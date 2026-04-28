@@ -6,12 +6,13 @@ import type { AssistantChatMessage } from "../../types/assistant";
 interface AssistantChatHistoryProps {
   messages: AssistantChatMessage[];
   isSending: boolean;
+  streamingContent?: string;
 }
 
 export const AssistantChatHistory = forwardRef<
   HTMLDivElement,
   AssistantChatHistoryProps
->(function AssistantChatHistory({ messages, isSending }, ref) {
+>(function AssistantChatHistory({ messages, isSending, streamingContent }, ref) {
   return (
     <div className="assistant-chat-history" id="assistant-chat-history" ref={ref}>
       {messages.map((message, index) => {
@@ -34,7 +35,14 @@ export const AssistantChatHistory = forwardRef<
         );
       })}
 
-      {isSending ? (
+      {isSending && streamingContent ? (
+        <div
+          className="assistant-message assistant-message-assistant"
+          dangerouslySetInnerHTML={{
+            __html: renderAssistantContent(streamingContent),
+          }}
+        />
+      ) : isSending ? (
         <div className="assistant-message assistant-message-loading">
           <p>답변을 생성하는 중입니다...</p>
         </div>

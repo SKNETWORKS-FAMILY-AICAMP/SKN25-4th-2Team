@@ -1,6 +1,6 @@
 import json
 
-from django.http import HttpRequest, JsonResponse
+from django.http import HttpRequest, JsonResponse, StreamingHttpResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
@@ -23,6 +23,7 @@ from .services import (
     logout_user,
     register_user,
     save_personal_api_key,
+    stream_agent_chat,
     toggle_favorite_paper,
     update_user_settings,
 )
@@ -216,6 +217,38 @@ def paper_chat(request: HttpRequest, arxiv_id: str):
         return JsonResponse({"error": f"답변 생성 실패: {exc}"}, status=500)
 
     return JsonResponse({"answer": answer})
+
+
+@require_POST
+def paper_agent_stream_chat(request: HttpRequest):
+    try:
+        body = _json_body(request)
+    except ValueError as exc:
+        return JsonResponse({"error": str(exc)}, status=400)
+
+    user_message = str(body.get("message", ""))
+    chat_history = body.get("history", [])
+
+    def event_stream():
+        try:
+            for chunk in stream_agent_chat(
+                user_message,
+                chat_history,
+                user=request.user,
+                session_api_key=get_session_api_key(request),
+            ):
+                yield f"data: {json.dumps({'chunk': chunk}, ensure_ascii=False)}\n\n"
+        except (AuthenticationRequiredError, MissingApiKeyError) as exc:
+            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'error': f'답변 생성 실패: {exc}'})}\n\n"
+        finally:
+            yield "data: [DONE]\n\n"
+
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream; charset=utf-8")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
 
 
 @require_POST

@@ -16,6 +16,7 @@ export default defineConfig(({ command }) => ({
       "/favorites/": djangoTarget,
       "/papers/list.json": djangoTarget,
       "/papers/assistant/chat/": djangoTarget,
+      "/papers/assistant/stream/": djangoTarget,
       "^/papers/[^/]+/detail\\.json$": djangoTarget,
       "^/papers/[^/]+/analyze/$": djangoTarget,
       "^/papers/[^/]+/summary/$": djangoTarget,
