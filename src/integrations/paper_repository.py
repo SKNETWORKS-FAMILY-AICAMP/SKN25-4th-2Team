@@ -8,7 +8,7 @@ import re
 import psycopg2
 from psycopg2.extras import Json
 
-from src.shared import AppSettings, get_settings, resolve_host_and_port
+from src.shared import AppSettings, build_postgres_connection_params, get_settings
 
 
 class PaperRepository:
@@ -700,27 +700,36 @@ class PaperRepository:
             )
             cursor.execute(
                 """
-                CREATE TABLE IF NOT EXISTS paper_ai_summaries (
+                CREATE TABLE IF NOT EXISTS paper_ai_overviews (
                     arxiv_id TEXT PRIMARY KEY REFERENCES papers(arxiv_id) ON DELETE CASCADE,
                     overview TEXT,
                     key_findings JSONB NOT NULL DEFAULT '[]'::jsonb,
-                    overview_model TEXT,
-                    overview_generated_at TIMESTAMPTZ,
-                    detailed_summary TEXT,
-                    summary_model TEXT,
-                    summary_generated_at TIMESTAMPTZ
+                    model TEXT NOT NULL,
+                    generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 );
                 """
             )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS paper_ai_detailed_summaries (
+                    id BIGSERIAL PRIMARY KEY,
+                    arxiv_id TEXT NOT NULL REFERENCES papers(arxiv_id) ON DELETE CASCADE,
+                    model TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    created_by_user_id BIGINT NULL,
+                    UNIQUE (arxiv_id, model)
+                );
+                """
+            )
+            cursor.execute("DROP TABLE IF EXISTS paper_ai_summaries;")
 
-    def get_paper_ai_summary(self, arxiv_id: str) -> dict[str, Any] | None:
-        """AI 분석 캐시를 조회한다. 미생성 시 None 반환."""
+    def get_paper_overview(self, arxiv_id: str) -> dict[str, Any] | None:
         with self._connection() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT overview, key_findings, overview_model, overview_generated_at,
-                       detailed_summary, summary_model, summary_generated_at
-                FROM paper_ai_summaries
+                SELECT overview, key_findings, model, generated_at
+                FROM paper_ai_overviews
                 WHERE arxiv_id = %s
                 """,
                 (arxiv_id,),
@@ -733,31 +742,49 @@ class PaperRepository:
         return {
             "overview": row[0],
             "key_findings": row[1] or [],
-            "overview_model": row[2],
-            "overview_generated_at": row[3].isoformat() if row[3] else None,
-            "detailed_summary": row[4],
-            "summary_model": row[5],
-            "summary_generated_at": row[6].isoformat() if row[6] else None,
+            "model": row[2],
+            "generated_at": row[3].isoformat() if row[3] else None,
         }
 
-    def upsert_overview(
+    def get_detailed_summary(self, arxiv_id: str, model_name: str) -> dict[str, Any] | None:
+        with self._connection() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT summary, model, generated_at, created_by_user_id
+                FROM paper_ai_detailed_summaries
+                WHERE arxiv_id = %s AND model = %s
+                """,
+                (arxiv_id, model_name),
+            )
+            row = cursor.fetchone()
+
+        if row is None:
+            return None
+
+        return {
+            "summary": row[0],
+            "model": row[1],
+            "generated_at": row[2].isoformat() if row[2] else None,
+            "created_by_user_id": row[3],
+        }
+
+    def upsert_paper_overview(
         self,
         arxiv_id: str,
         overview: str,
         key_findings: list[str],
         model_name: str,
     ) -> None:
-        """overview / key_findings를 저장한다. detailed_summary 컬럼은 변경하지 않는다."""
         with self._connection() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO paper_ai_summaries (arxiv_id, overview, key_findings, overview_model, overview_generated_at)
+                INSERT INTO paper_ai_overviews (arxiv_id, overview, key_findings, model, generated_at)
                 VALUES (%s, %s, %s, %s, NOW())
                 ON CONFLICT (arxiv_id) DO UPDATE SET
                     overview = EXCLUDED.overview,
                     key_findings = EXCLUDED.key_findings,
-                    overview_model = EXCLUDED.overview_model,
-                    overview_generated_at = NOW()
+                    model = EXCLUDED.model,
+                    generated_at = NOW()
                 """,
                 (arxiv_id, overview, Json(key_findings), model_name),
             )
@@ -767,42 +794,24 @@ class PaperRepository:
         arxiv_id: str,
         summary: str,
         model_name: str,
+        *,
+        created_by_user_id: int | None = None,
     ) -> None:
-        """detailed_summary를 저장한다. overview 컬럼은 변경하지 않는다."""
         with self._connection() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO paper_ai_summaries (arxiv_id, detailed_summary, summary_model, summary_generated_at)
-                VALUES (%s, %s, %s, NOW())
-                ON CONFLICT (arxiv_id) DO UPDATE SET
-                    detailed_summary = EXCLUDED.detailed_summary,
-                    summary_model = EXCLUDED.summary_model,
-                    summary_generated_at = NOW()
+                INSERT INTO paper_ai_detailed_summaries (arxiv_id, model, summary, generated_at, created_by_user_id)
+                VALUES (%s, %s, %s, NOW(), %s)
+                ON CONFLICT (arxiv_id, model) DO UPDATE SET
+                    summary = EXCLUDED.summary,
+                    generated_at = NOW(),
+                    created_by_user_id = EXCLUDED.created_by_user_id
                 """,
-                (arxiv_id, summary, model_name),
+                (arxiv_id, model_name, summary, created_by_user_id),
             )
 
     def _build_postgres_connection_params(self) -> dict[str, Any]:
-        host = self.settings.postgres_host
-        db_name = self.settings.app_postgres_db or self.settings.postgres_db
-        user = self.settings.postgres_user
-        password = self.settings.postgres_password
-
-        if not host:
-            raise ValueError("POSTGRES_HOST가 설정되지 않았습니다.")
-        if not db_name:
-            raise ValueError("APP_POSTGRES_DB 또는 POSTGRES_DB가 설정되지 않았습니다.")
-        if not user or not password:
-            raise ValueError("POSTGRES_USER 또는 POSTGRES_PASSWORD가 설정되지 않았습니다.")
-
-        resolved_host, resolved_port = resolve_host_and_port(host, self.settings.server_postgres_port)
-        return {
-            "dbname": db_name,
-            "user": user,
-            "password": password,
-            "host": resolved_host,
-            "port": resolved_port,
-        }
+        return build_postgres_connection_params(self.settings)
 
     @classmethod
     def _sanitize_json_value(cls, value: Any) -> Any:

@@ -7,7 +7,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 
-from src.shared import get_settings
+from src.shared import get_runtime_openai_api_key, get_runtime_openai_model
 
 from .prompts import SUMMARY_BUCKET_PROMPT, SUMMARY_PROMPT, SUMMARY_SECTION_PROMPT
 from .tracing import build_summary_trace_config
@@ -36,15 +36,16 @@ class SummaryGraphState(TypedDict, total=False):
 
 
 def _build_llm(temperature: float = 0.1) -> ChatOpenAI:
-    settings = get_settings()
-    if not settings.openai_api_key:
+    api_key = get_runtime_openai_api_key()
+    model = get_runtime_openai_model()
+    if not api_key:
         raise ValueError("OPENAI_API_KEY가 설정되지 않아 한국어 번역/요약 체인을 실행할 수 없습니다.")
 
     kwargs = {
-        "model": settings.openai_model,
-        "api_key": settings.openai_api_key,
+        "model": model,
+        "api_key": api_key,
     }
-    if not settings.openai_model.startswith("gpt-5"):
+    if not model.startswith("gpt-5"):
         kwargs["temperature"] = temperature
 
     return ChatOpenAI(**kwargs)

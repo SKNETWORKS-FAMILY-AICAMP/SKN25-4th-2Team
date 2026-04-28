@@ -1,6 +1,8 @@
+from contextlib import contextmanager
+from contextvars import ContextVar
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 from urllib.parse import urlsplit
 
 from dotenv import dotenv_values
@@ -85,6 +87,11 @@ class AppSettings(BaseSettings):
         return self
 
 
+_UNSET = object()
+_runtime_openai_api_key: ContextVar[Optional[str] | object] = ContextVar("runtime_openai_api_key", default=_UNSET)
+_runtime_openai_model: ContextVar[Optional[str] | object] = ContextVar("runtime_openai_model", default=_UNSET)
+
+
 def resolve_host_and_port(host: str, default_port: int) -> tuple[str, int]:
     normalized = host.strip()
     if not normalized:
@@ -98,6 +105,77 @@ def resolve_host_and_port(host: str, default_port: int) -> tuple[str, int]:
     return hostname, parsed.port or default_port
 
 
+def build_postgres_connection_params(settings: AppSettings) -> dict[str, Any]:
+    host = settings.postgres_host
+    db_name = settings.app_postgres_db or settings.postgres_db
+    user = settings.postgres_user
+    password = settings.postgres_password
+
+    if not host:
+        raise ValueError("POSTGRES_HOST가 설정되지 않았습니다.")
+    if not db_name:
+        raise ValueError("APP_POSTGRES_DB 또는 POSTGRES_DB가 설정되지 않았습니다.")
+    if not user or not password:
+        raise ValueError("POSTGRES_USER 또는 POSTGRES_PASSWORD가 설정되지 않았습니다.")
+
+    resolved_host, resolved_port = resolve_host_and_port(host, settings.server_postgres_port)
+    return {
+        "dbname": db_name,
+        "user": user,
+        "password": password,
+        "host": resolved_host,
+        "port": resolved_port,
+    }
+
+
+def build_django_postgres_database_config(settings: AppSettings) -> dict[str, Any]:
+    params = build_postgres_connection_params(settings)
+    return {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": params["dbname"],
+        "USER": params["user"],
+        "PASSWORD": params["password"],
+        "HOST": params["host"],
+        "PORT": params["port"],
+        "CONN_MAX_AGE": 60,
+        "CONN_HEALTH_CHECKS": True,
+    }
+
+
 @lru_cache(maxsize=1)
 def get_settings() -> AppSettings:
     return AppSettings()
+
+
+def get_runtime_openai_api_key() -> Optional[str]:
+    override = _runtime_openai_api_key.get()
+    if override is not _UNSET:
+        return override
+    return get_settings().openai_api_key
+
+
+def get_runtime_openai_model(default_model: Optional[str] = None) -> str:
+    override = _runtime_openai_model.get()
+    if override is not _UNSET and override:
+        return str(override)
+    if default_model:
+        return default_model
+    return get_settings().openai_model
+
+
+@contextmanager
+def override_openai_runtime(*, api_key: Optional[str] = None, model: Optional[str] = None):
+    api_key_token = None
+    model_token = None
+    if api_key is not None:
+        api_key_token = _runtime_openai_api_key.set(api_key)
+    if model is not None:
+        model_token = _runtime_openai_model.set(model)
+
+    try:
+        yield
+    finally:
+        if model_token is not None:
+            _runtime_openai_model.reset(model_token)
+        if api_key_token is not None:
+            _runtime_openai_api_key.reset(api_key_token)

@@ -1,0 +1,460 @@
+from __future__ import annotations
+
+from functools import lru_cache
+from typing import Any
+
+from django.contrib.auth import authenticate, get_user_model, login, logout
+from django.contrib.auth.models import AbstractBaseUser, AnonymousUser
+from django.core.paginator import Paginator
+from django.http import HttpRequest
+
+from src.shared import override_openai_runtime
+
+from .models import DEFAULT_SUMMARY_MODEL, FavoritePaper, UserSettings
+
+
+MAX_RECENT_PAPERS = 1500
+PAPERS_PER_PAGE = 21
+PAPER_CHUNK_LIMIT = 20
+VALID_SEARCH_MODES = {"search", "ai"}
+SESSION_API_KEY_KEY = "personal_openai_api_key"
+OVERVIEW_MODEL = "gpt-5-mini"
+AVAILABLE_SUMMARY_MODELS = ("gpt-5-mini", "gpt-5")
+
+
+class PaperNotFoundError(LookupError):
+    pass
+
+
+class MissingApiKeyError(RuntimeError):
+    pass
+
+
+class AuthenticationRequiredError(PermissionError):
+    pass
+
+
+class InvalidSummaryModelError(ValueError):
+    pass
+
+
+@lru_cache(maxsize=1)
+def get_paper_repository():
+    from src.integrations.paper_repository import PaperRepository
+
+    return PaperRepository()
+
+
+def build_paper_list_payload(*, query: str, sort: str, mode: str, page: Any, user: AbstractBaseUser | AnonymousUser) -> dict[str, Any]:
+    papers = get_paper_repository().list_recent_papers(limit=MAX_RECENT_PAPERS)
+    normalized_query = query.strip()
+    normalized_mode = mode if mode in VALID_SEARCH_MODES else "search"
+    normalized_sort = "upvotes" if sort == "upvotes" else "latest"
+
+    if normalized_query:
+        lowered_query = normalized_query.lower()
+        papers = [
+            paper
+            for paper in papers
+            if lowered_query in (paper.get("title") or "").lower()
+            or lowered_query in (paper.get("abstract") or "").lower()
+        ]
+
+    if normalized_sort == "upvotes":
+        papers.sort(key=lambda paper: paper.get("upvotes") or 0, reverse=True)
+
+    paginator = Paginator(papers, PAPERS_PER_PAGE)
+    page_obj = paginator.get_page(_parse_page_number(page))
+    favorite_ids = _get_favorite_ids(user, [paper.get("arxiv_id") for paper in page_obj.object_list])
+
+    return {
+        "items": [_serialize_paper_for_list(paper, favorite_ids=favorite_ids) for paper in page_obj.object_list],
+        "page": page_obj.number,
+        "page_size": page_obj.paginator.per_page,
+        "total_items": page_obj.paginator.count,
+        "total_pages": page_obj.paginator.num_pages,
+        "query": normalized_query,
+        "sort": normalized_sort,
+        "mode": normalized_mode,
+    }
+
+
+def build_paper_detail_payload(arxiv_id: str, *, user: AbstractBaseUser | AnonymousUser) -> dict[str, Any]:
+    _require_authenticated_user(user)
+    favorite_ids = _get_favorite_ids(user, [arxiv_id])
+    return {
+        "paper": _serialize_paper_for_detail(_get_paper_or_raise(arxiv_id), favorite_ids=favorite_ids),
+    }
+
+
+def build_bootstrap_payload(request: HttpRequest) -> dict[str, Any]:
+    user = request.user
+    preferred_model = DEFAULT_SUMMARY_MODEL
+    username = ""
+    if getattr(user, "is_authenticated", False):
+        username = user.get_username()
+        preferred_model = _get_or_create_user_settings(user).preferred_summary_model
+
+    return {
+        "is_authenticated": bool(getattr(user, "is_authenticated", False)),
+        "username": username,
+        "has_personal_api_key": has_personal_api_key(request),
+        "preferred_summary_model": preferred_model,
+        "available_summary_models": list(AVAILABLE_SUMMARY_MODELS),
+    }
+
+
+def build_settings_payload(user: AbstractBaseUser | AnonymousUser) -> dict[str, Any]:
+    _require_authenticated_user(user)
+    settings_obj = _get_or_create_user_settings(user)
+    return {
+        "preferred_summary_model": settings_obj.preferred_summary_model,
+        "available_summary_models": list(AVAILABLE_SUMMARY_MODELS),
+    }
+
+
+def build_favorites_payload(user: AbstractBaseUser | AnonymousUser) -> dict[str, Any]:
+    _require_authenticated_user(user)
+    favorite_rows = list(
+        FavoritePaper.objects.filter(user=user).order_by("-created_at").values_list("arxiv_id", flat=True)
+    )
+    repo = get_paper_repository()
+    items: list[dict[str, Any]] = []
+    for arxiv_id in favorite_rows:
+        paper = repo.get_paper(arxiv_id)
+        if not paper:
+            continue
+        items.append(_serialize_paper_for_list(paper, favorite_ids={arxiv_id}))
+    return {"items": items}
+
+
+def save_personal_api_key(request: HttpRequest, api_key: str) -> dict[str, Any]:
+    _require_authenticated_user(request.user)
+    normalized = api_key.strip()
+    if not normalized:
+        raise ValueError("API 키를 입력하세요.")
+    request.session[SESSION_API_KEY_KEY] = normalized
+    request.session.modified = True
+    return {"ok": True, "has_personal_api_key": True}
+
+
+def clear_personal_api_key(request: HttpRequest) -> dict[str, Any]:
+    _require_authenticated_user(request.user)
+    request.session.pop(SESSION_API_KEY_KEY, None)
+    request.session.modified = True
+    return {"ok": True, "has_personal_api_key": False}
+
+
+def get_session_api_key(request: HttpRequest) -> str | None:
+    value = request.session.get(SESSION_API_KEY_KEY)
+    if not value:
+        return None
+    normalized = str(value).strip()
+    return normalized or None
+
+
+def has_personal_api_key(request: HttpRequest) -> bool:
+    return bool(get_session_api_key(request))
+
+
+def register_user(*, username: str, password: str) -> dict[str, Any]:
+    normalized_username = username.strip()
+    if not normalized_username:
+        raise ValueError("사용자 이름을 입력하세요.")
+    if not password:
+        raise ValueError("비밀번호를 입력하세요.")
+
+    user_model = get_user_model()
+    if user_model.objects.filter(username=normalized_username).exists():
+        raise ValueError("이미 존재하는 사용자 이름입니다.")
+
+    user = user_model.objects.create_user(username=normalized_username, password=password)
+    _get_or_create_user_settings(user)
+    return {"ok": True, "username": user.get_username()}
+
+
+def login_user(request: HttpRequest, *, username: str, password: str) -> dict[str, Any]:
+    normalized_username = username.strip()
+    if not normalized_username or not password:
+        raise ValueError("사용자 이름과 비밀번호를 입력하세요.")
+
+    user = authenticate(request, username=normalized_username, password=password)
+    if user is None:
+        raise ValueError("로그인에 실패했습니다.")
+
+    login(request, user)
+    _get_or_create_user_settings(user)
+    return {"ok": True, "username": user.get_username()}
+
+
+def logout_user(request: HttpRequest) -> dict[str, Any]:
+    request.session.pop(SESSION_API_KEY_KEY, None)
+    logout(request)
+    return {"ok": True}
+
+
+def build_auth_payload(user: AbstractBaseUser | AnonymousUser) -> dict[str, Any]:
+    if not getattr(user, "is_authenticated", False):
+        return {"is_authenticated": False, "username": ""}
+    return {"is_authenticated": True, "username": user.get_username()}
+
+
+def update_user_settings(*, user: AbstractBaseUser | AnonymousUser, preferred_summary_model: str) -> dict[str, Any]:
+    _require_authenticated_user(user)
+    normalized_model = preferred_summary_model.strip()
+    if normalized_model not in AVAILABLE_SUMMARY_MODELS:
+        raise InvalidSummaryModelError("지원하지 않는 모델입니다.")
+
+    settings_obj = _get_or_create_user_settings(user)
+    settings_obj.preferred_summary_model = normalized_model
+    settings_obj.save(update_fields=["preferred_summary_model", "updated_at"])
+    return {"ok": True, "preferred_summary_model": normalized_model}
+
+
+def toggle_favorite_paper(*, user: AbstractBaseUser | AnonymousUser, arxiv_id: str) -> dict[str, Any]:
+    _require_authenticated_user(user)
+    _get_paper_or_raise(arxiv_id)
+    favorite, created = FavoritePaper.objects.get_or_create(user=user, arxiv_id=arxiv_id)
+    if created:
+        return {"is_favorited": True}
+
+    favorite.delete()
+    return {"is_favorited": False}
+
+
+def get_paper_analysis(
+    arxiv_id: str,
+    *,
+    user: AbstractBaseUser | AnonymousUser,
+    session_api_key: str | None,
+) -> dict[str, Any]:
+    _require_authenticated_user(user)
+    api_key = _require_personal_api_key(session_api_key)
+
+    repo = get_paper_repository()
+    paper = _get_paper_or_raise(arxiv_id)
+    cached = repo.get_paper_overview(arxiv_id)
+
+    if cached and cached.get("overview"):
+        return {
+            "overview": cached["overview"],
+            "key_findings": cached.get("key_findings") or [],
+            "cached": True,
+        }
+
+    fulltext = repo.get_paper_fulltext(arxiv_id) or {}
+    chunks = repo.list_paper_chunks(arxiv_id, limit=PAPER_CHUNK_LIMIT)
+    enriched_paper = dict(paper)
+    enriched_paper["text"] = fulltext.get("text") or ""
+    enriched_paper["sections"] = fulltext.get("sections") or []
+    enriched_paper["chunks"] = chunks
+
+    from src.core import analyze_paper_detail
+
+    with override_openai_runtime(api_key=api_key, model=OVERVIEW_MODEL):
+        summary_doc = analyze_paper_detail(enriched_paper, user=user.get_username())
+    overview = summary_doc.overview if summary_doc else None
+    key_findings = summary_doc.key_findings if summary_doc else []
+
+    if overview:
+        repo.upsert_paper_overview(arxiv_id, overview, key_findings, OVERVIEW_MODEL)
+
+    return {
+        "overview": overview,
+        "key_findings": key_findings,
+        "cached": False,
+    }
+
+
+def get_paper_summary(
+    arxiv_id: str,
+    *,
+    model: str,
+    user: AbstractBaseUser | AnonymousUser,
+    session_api_key: str | None,
+) -> dict[str, Any]:
+    _require_authenticated_user(user)
+    api_key = _require_personal_api_key(session_api_key)
+    normalized_model = model.strip()
+    if normalized_model not in AVAILABLE_SUMMARY_MODELS:
+        raise InvalidSummaryModelError("지원하지 않는 모델입니다.")
+
+    repo = get_paper_repository()
+    paper = dict(_get_paper_or_raise(arxiv_id))
+    cached = repo.get_detailed_summary(arxiv_id, normalized_model)
+
+    if cached and cached.get("summary"):
+        return {
+            "summary": cached["summary"],
+            "cached": True,
+            "model": normalized_model,
+        }
+
+    fulltext = repo.get_paper_fulltext(arxiv_id) or {}
+    paper["text"] = fulltext.get("text") or ""
+    paper["sections"] = fulltext.get("sections") or []
+
+    from src.core.translation_chains import build_summary
+
+    summary_text = paper.get("text") or "\n\n".join(
+        f"[{section.get('title', '')}]\n{section.get('text', '')}"
+        for section in paper.get("sections", [])
+    )
+    with override_openai_runtime(api_key=api_key, model=normalized_model):
+        result = build_summary(
+            title=paper["title"],
+            authors=paper["authors"],
+            text=summary_text,
+            sections=paper.get("sections"),
+            user=user.get_username(),
+        )
+
+    if result:
+        repo.upsert_detailed_summary(
+            arxiv_id,
+            result,
+            normalized_model,
+            created_by_user_id=getattr(user, "id", None),
+        )
+
+    return {
+        "summary": result,
+        "cached": False,
+        "model": normalized_model,
+    }
+
+
+def answer_paper_chat(
+    arxiv_id: str,
+    user_message: str,
+    chat_history: list[dict[str, Any]],
+    *,
+    user: AbstractBaseUser | AnonymousUser,
+    session_api_key: str | None,
+) -> str:
+    _require_authenticated_user(user)
+    api_key = _require_personal_api_key(session_api_key)
+    cleaned_message = user_message.strip()
+    if not cleaned_message:
+        raise ValueError("메시지를 입력하세요.")
+
+    repo = get_paper_repository()
+    _get_paper_or_raise(arxiv_id)
+    chunks = repo.list_paper_chunks(arxiv_id, limit=PAPER_CHUNK_LIMIT)
+
+    from src.core.agent.chatbot import stream_answer_question
+
+    with override_openai_runtime(api_key=api_key):
+        answer_stream = stream_answer_question(
+            cleaned_message,
+            context_papers=chunks,
+            chat_history=_build_history_tuples(chat_history),
+            user=user.get_username(),
+        )
+        return "".join(answer_stream)
+
+
+def answer_agent_chat(
+    user_message: str,
+    chat_history: list[dict[str, Any]],
+    *,
+    user: AbstractBaseUser | AnonymousUser,
+    session_api_key: str | None,
+) -> str:
+    _require_authenticated_user(user)
+    api_key = _require_personal_api_key(session_api_key)
+    cleaned_message = user_message.strip()
+    if not cleaned_message:
+        raise ValueError("메시지를 입력하세요.")
+
+    from src.core.agent.chatbot import agent_search
+
+    with override_openai_runtime(api_key=api_key):
+        result = agent_search(
+            cleaned_message,
+            chat_history=_build_history_tuples(chat_history),
+            user=user.get_username(),
+        )
+    return result.get("answer") or "답변을 생성할 수 없습니다."
+
+
+def _get_paper_or_raise(arxiv_id: str) -> dict[str, Any]:
+    repo = get_paper_repository()
+    paper = repo.get_paper(arxiv_id)
+    if not paper:
+        from src.integrations.paper_search import PaperSearchClient
+
+        normalized_arxiv_id = PaperSearchClient.normalize_arxiv_id(arxiv_id)
+        if normalized_arxiv_id != arxiv_id:
+            paper = repo.get_paper(normalized_arxiv_id)
+    if not paper:
+        raise PaperNotFoundError("논문을 찾을 수 없습니다.")
+    return paper
+
+
+def _require_authenticated_user(user: AbstractBaseUser | AnonymousUser) -> None:
+    if not getattr(user, "is_authenticated", False):
+        raise AuthenticationRequiredError("로그인이 필요합니다.")
+
+
+def _require_personal_api_key(session_api_key: str | None) -> str:
+    normalized = (session_api_key or "").strip()
+    if not normalized:
+        raise MissingApiKeyError("개인 API 키를 먼저 등록하세요.")
+    return normalized
+
+
+def _parse_page_number(raw_page: Any) -> int:
+    try:
+        page_number = int(raw_page)
+    except (TypeError, ValueError):
+        return 1
+    return page_number if page_number > 0 else 1
+
+
+def _build_history_tuples(chat_history: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    return [
+        (message["role"], message["content"])
+        for message in chat_history
+        if message.get("role") in ("user", "assistant") and message.get("content")
+    ]
+
+
+def _get_or_create_user_settings(user: AbstractBaseUser) -> UserSettings:
+    settings_obj, _ = UserSettings.objects.get_or_create(
+        user=user,
+        defaults={"preferred_summary_model": DEFAULT_SUMMARY_MODEL},
+    )
+    return settings_obj
+
+
+def _get_favorite_ids(
+    user: AbstractBaseUser | AnonymousUser,
+    arxiv_ids: list[str | None],
+) -> set[str]:
+    if not getattr(user, "is_authenticated", False):
+        return set()
+    normalized_ids = [arxiv_id for arxiv_id in arxiv_ids if arxiv_id]
+    if not normalized_ids:
+        return set()
+    return set(
+        FavoritePaper.objects.filter(user=user, arxiv_id__in=normalized_ids).values_list("arxiv_id", flat=True)
+    )
+
+
+def _serialize_paper_for_list(paper: dict[str, Any], *, favorite_ids: set[str]) -> dict[str, Any]:
+    arxiv_id = paper.get("arxiv_id")
+    return {
+        "arxiv_id": arxiv_id,
+        "title": paper.get("title") or "",
+        "authors": paper.get("authors") or [],
+        "abstract": paper.get("abstract") or "",
+        "published_at": paper.get("published_at"),
+        "upvotes": paper.get("upvotes") or 0,
+        "pdf_url": paper.get("pdf_url"),
+        "is_favorited": bool(arxiv_id and arxiv_id in favorite_ids),
+    }
+
+
+def _serialize_paper_for_detail(paper: dict[str, Any], *, favorite_ids: set[str]) -> dict[str, Any]:
+    return _serialize_paper_for_list(paper, favorite_ids=favorite_ids)

@@ -1,0 +1,1 @@
+export { PaperDetailPage } from "./PaperDetailPage";

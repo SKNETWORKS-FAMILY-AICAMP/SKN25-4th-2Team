@@ -68,7 +68,7 @@ def _run_embed_after_prepare(
         selected_sum = 0
         embedded_sum = 0
         try:
-            # arxiv_id별로 아직 임베딩이 없는 chunk가 남아 있으면 반복 처리한다.
+            # 한 번에 처리량이 제한되므로 남은 청크가 있으면 같은 논문을 반복 임베딩한다.
             for _ in range(100):
                 embed_result = run_embed_papers(
                     runtime="local",

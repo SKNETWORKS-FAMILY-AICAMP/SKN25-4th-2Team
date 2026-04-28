@@ -20,6 +20,7 @@ docker compose -p "${PROJECT_NAME}" -f docker-compose.dev.yml ps
 
 echo
 echo "[dev] 접속 정보"
-echo "Jupyter: http://127.0.0.1:${JUPYTER_PORT:-18888}"
-echo "Streamlit: 컨테이너 접속 후 수동 실행"
+echo "Frontend:  http://localhost:${FRONTEND_PORT:-5173}"
+echo "Jupyter: http://localhost:${JUPYTER_PORT:-18888} (WSL 외부 접속 시 WSL IP 사용)"
+echo "Django:    http://localhost:${DJANGO_PORT:-18001} (API + React shell)"
 echo "접속 명령: docker compose -p ${PROJECT_NAME} -f docker-compose.dev.yml exec dev bash"

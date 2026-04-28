@@ -27,7 +27,7 @@ flowchart TD
     L --> M[Retrieval<br/>lexical / vector / hybrid / rerank]
     L --> N[Paper Detail Generation<br/>overview / key_findings / summary / translation]
     M --> O[RAG Answer Chain]
-    N --> P[Streamlit UI]
+    N --> P[React UI]
     O --> P
 ```
 
@@ -62,7 +62,7 @@ flowchart TD
 
 ### 로컬 개발 런타임
 
-로컬 개발 환경은 `docker-compose.dev.yml`의 `arxplore-dev` 컨테이너를 중심으로 동작한다. 이 컨테이너는 Python 실행, Jupyter, Streamlit, 스크립트 검증, notebook 실험을 담당한다.
+로컬 개발 환경은 `docker-compose.dev.yml`의 `arxplore-dev`, `arxplore-django`, `arxplore-frontend` 컨테이너를 중심으로 동작한다. 이 스택은 Python 실행, Jupyter, Django API, React 프론트엔드, 스크립트 검증, notebook 실험을 담당한다.
 
 ### 로컬 parser 런타임
 
@@ -82,8 +82,9 @@ flowchart TD
     Shared --> Core[src/core<br/>models / prompts / chains / rag / tracing]
     Integrations --> Pipeline[src/pipeline<br/>collect / prepare / embed / worker]
     Pipeline --> Dags[dags<br/>daily_collect / maintenance]
-    Core --> UI[app<br/>Streamlit UI]
-    Integrations --> UI
+    Core --> Web[web<br/>Django API + React shell]
+    Integrations --> Web
+    Web --> Frontend[frontend<br/>React UI]
 ```
 
 ### `src/shared`
@@ -155,12 +156,21 @@ Airflow가 파싱하는 DAG 정의만 둔다.
 - `dags/daily_collect.py`
 - `dags/maintenance.py`
 
-### `app`
+### `web`
 
-Streamlit UI 계층이다.
+Django 백엔드 계층이다.
 
-- `app/main.py`: 메인 화면 플레이스홀더
-- `app/paper_detail_demo.py`: 논문 상세 데모 (overview / key findings / detailed summary / translation 검증)
+- `web/arxplore_web/`: Django 설정과 프로젝트 URL
+- `web/papers/api_views.py`: 분석, 요약, 채팅, bootstrap API
+- `web/papers/page_views.py`: React shell과 JSON endpoint
+
+### `frontend`
+
+React UI 계층이다.
+
+- `frontend/src/pages/list/`: 논문 목록 화면
+- `frontend/src/pages/detail/`: 논문 상세 화면
+- `frontend/src/pages/assistant/`: 어시스턴트 화면
 
 UI는 retrieval과 논문 상세 문서를 소비하는 계층이며, 저장 구조나 외부 연동 코드를 직접 구현하는 위치가 아니다.
 
@@ -181,7 +191,7 @@ UI는 retrieval과 논문 상세 문서를 소비하는 계층이며, 저장 구
 11. `arxplore_maintenance`는 과거 raw 백필과 메타데이터 후속 보강을 수행한다
 12. retrieval 계층이 `paper_chunks`, `paper_embeddings`를 사용해 검색 결과를 만든다
 13. 논문 상세 문서 생성과 answer chain이 이 데이터를 소비한다
-14. Streamlit UI가 논문 상세 문서와 answer payload를 렌더링한다
+14. React UI가 논문 상세 문서와 answer payload를 렌더링한다
 
 이 흐름에서 raw payload는 MongoDB가 source of truth 역할을 하고, PostgreSQL 정제층은 재생성 가능한 읽기/검색 계층 역할을 한다.
 
@@ -312,4 +322,4 @@ LangSmith는 단계별 trace를 남기는 데 사용한다. 현재 기준 핵심
 - PostgreSQL + pgvector를 활용한 fulltext, chunk, embedding 적재
 - lexical/vector/hybrid retrieval 파이프라인
 - LangGraph React Agent 기반 에이전틱 챗봇 (문맥 유지 및 스트리밍 응답 지원)
-- Streamlit Modular UI (Views, Components 라우팅 분리) 및 메인 그리드 페이징
+- React 기반 목록/상세/어시스턴트 UI와 Django API 분리

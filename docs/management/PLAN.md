@@ -55,7 +55,7 @@ ArXplore는 세 층의 소스를 구분한다.
 4. 논문 상세 문서(`PaperDetailDocument`) 생성 체인
 5. 한국어 상세 요약 및 근거 번역 체인
 6. RAG 기반 질의응답 계층
-7. Streamlit 기반 검색/탐색 UI
+7. React 기반 검색/탐색 UI
 8. 운영 문서와 역할 문서
 
 ## 5. 현재 단계에서 이미 반영된 것
@@ -84,7 +84,7 @@ ArXplore는 세 층의 소스를 구분한다.
 - answer chain과 citation 정책
 - 한국어 번역과 상세 요약 규칙
 - 논문 상세 문서(`PaperDetailDocument`) 생성 품질과 평가 루프
-- Streamlit 논문 목록/상세 소비 계층 완성
+- React 논문 목록/상세 소비 계층 완성
 
 현재 범위에서 보수적으로 두는 것은 다음과 같다.
 
@@ -280,10 +280,10 @@ PostgreSQL은 정제 데이터와 운영 queue를 함께 저장한다.
 
 ### Phase 5. UI 통합 및 에이전트 구축 (현재 완료)
 
-- Streamlit 단일 구조에서 `views/`, `components/` 모듈화 라우팅 방식으로 전환
-- 메모리를 유지하는 최상위 `agent_chat_page` (LangGraph React 에이전트 기반) 스마트 챗봇 신설
-- URL 하이퍼링크 다이렉트 문서 이동 지원 및 텍스트 청크 스트리밍 UI 연동 완료
-- 페이징 및 강제 스크롤 제어를 통한 검색 성능 체감 및 편의성 극대화
+- React + Django 분리 구조로 전환
+- 목록, 상세, 어시스턴트 페이지를 React로 통합
+- Django는 API와 React shell만 담당
+- 내부 논문 상세 링크와 JSON endpoint 연동 완료
 
 ## 15. 역할 분담 전제
 
@@ -302,9 +302,10 @@ ArXplore는 현재 5역할 병렬 개발을 전제로 한다.
 - `bash scripts/setup-dev.sh`
 - `bash scripts/setup-server.sh`
 - `docker compose -f docker-compose.parser.yml up -d --build`
-- `python3 -m compileall src app dags`
+- `python3 -m compileall src web dags`
 - `bash scripts/prepare-worker.sh once`
-- `streamlit run app/main.py --server.address=0.0.0.0`
+- `docker compose -p arxplore_dev -f docker-compose.dev.yml exec -T frontend npm run build`
+- `docker compose -p arxplore_dev -f docker-compose.dev.yml exec -T django bash -lc 'cd /workspace/web && python manage.py check'`
 - Airflow DAG 목록에 `arxplore_daily_collect`, `arxplore_maintenance`가 표시되는지 확인
 - `notebooks/retrieval_inspection.ipynb`로 적재 상태와 retrieval 결과를 확인
 

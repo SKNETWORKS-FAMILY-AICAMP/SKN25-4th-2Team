@@ -5,6 +5,9 @@ dist/
 build/
 .venv/
 .env
+node_modules/
+frontend/node_modules/
+*.tsbuildinfo
 notebooks/
 .ipynb_checkpoints/
 airflow.db
@@ -19,12 +22,12 @@ data/postgres/
 .idea/
 .DS_Store
 Thumbs.db
+web/db.sqlite3
+web/staticfiles/
+docs/tmp/
 
 tests/
 prepare_*.log
-test_streamlit.py
 
 # Local playground / ad-hoc test files
 20260406.ipynb
-app/paper_detail_playground.py
-app/topic_document_playground.py

@@ -7,7 +7,7 @@ from typing import Any, Optional
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 
-from src.shared import get_settings
+from src.shared import get_runtime_openai_api_key, get_runtime_openai_model
 
 from .models import PaperDetailDocument
 from .prompts import KEY_FINDINGS_PROMPT, OVERVIEW_PROMPT
@@ -15,15 +15,16 @@ from .tracing import build_paper_key_findings_trace_config, build_paper_overview
 
 
 def _build_llm() -> ChatOpenAI:
-    settings = get_settings()
-    if not settings.openai_api_key:
+    api_key = get_runtime_openai_api_key()
+    model = get_runtime_openai_model()
+    if not api_key:
         raise ValueError("OPENAI_API_KEY가 설정되지 않아 논문 상세 문서를 생성할 수 없습니다.")
 
     kwargs = {
-        "model": settings.openai_model,
-        "api_key": settings.openai_api_key,
+        "model": model,
+        "api_key": api_key,
     }
-    if not settings.openai_model.startswith("gpt-5"):
+    if not model.startswith("gpt-5"):
         kwargs["temperature"] = 0.2
 
     return ChatOpenAI(**kwargs)

@@ -2,7 +2,7 @@ from typing import Any, Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.output_parsers import StrOutputParser
 from langgraph.prebuilt import create_react_agent
-from src.shared import get_settings
+from src.shared import get_runtime_openai_api_key, get_runtime_openai_model
 from src.core.prompts.answer import ANSWER_QUESTION_PROMPT
 from src.core.tracing import build_rag_answer_trace_config
 
@@ -16,10 +16,11 @@ def answer_question(
     runtime: str = "dev",
     user: Optional[str] = None,
 ) -> dict[str, Any]:
-    settings = get_settings()
+    model = get_runtime_openai_model()
+    api_key = get_runtime_openai_api_key()
     llm = ChatOpenAI(
-        model=settings.openai_model,
-        api_key=settings.openai_api_key,
+        model=model,
+        api_key=api_key,
         temperature=0.0,
     )
     chain = ANSWER_QUESTION_PROMPT | llm | StrOutputParser()
@@ -49,10 +50,11 @@ def stream_answer_question(
     runtime: str = "dev",
     user: Optional[str] = None,
 ):
-    settings = get_settings()
+    model = get_runtime_openai_model()
+    api_key = get_runtime_openai_api_key()
     llm = ChatOpenAI(
-        model=settings.openai_model,
-        api_key=settings.openai_api_key,
+        model=model,
+        api_key=api_key,
         temperature=0.0,
     )
     chain = ANSWER_QUESTION_PROMPT | llm | StrOutputParser()
@@ -74,10 +76,11 @@ def agent_search(
     runtime: str = "dev", 
     user: Optional[str] = None
 ) -> dict[str, Any]:
-    settings = get_settings()
+    model = get_runtime_openai_model()
+    api_key = get_runtime_openai_api_key()
     llm = ChatOpenAI(
-        model=settings.openai_model,
-        api_key=settings.openai_api_key,
+        model=model,
+        api_key=api_key,
         temperature=0.0,
     )
     tools = [search_paper_chunks_tool, get_trending_papers_tool]
@@ -110,10 +113,11 @@ def stream_agent_search(
     runtime: str = "dev", 
     user: Optional[str] = None
 ):
-    settings = get_settings()
+    model = get_runtime_openai_model()
+    api_key = get_runtime_openai_api_key()
     llm = ChatOpenAI(
-        model=settings.openai_model,
-        api_key=settings.openai_api_key,
+        model=model,
+        api_key=api_key,
         temperature=0.0,
     )
     tools = [search_paper_chunks_tool, get_trending_papers_tool]

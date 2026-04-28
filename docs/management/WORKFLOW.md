@@ -56,7 +56,8 @@ docker compose -p arxplore_dev -f docker-compose.dev.yml exec dev bash
 - Python 코드 작성
 - retrieval, prompt, chain 검증
 - notebook 실험
-- Streamlit 실행
+- Django API 실행
+- React 프론트엔드 실행
 - 간단한 데이터 점검
 
 ### 로컬 parser 모드
@@ -117,7 +118,7 @@ docker compose -p arxplore_server -f docker-compose.server.yml ps
 
 ### 5단계: UI 소비 계층 정리
 
-- retrieval 결과, answer payload, `PaperDetailDocument`를 Streamlit에 연결한다
+- retrieval 결과, answer payload, `PaperDetailDocument`를 React UI에 연결한다
 - 논문 목록, ��문 상세, 검색 흐름을 통합한다
 
 이 순서는 완전한 직렬 흐름이 아니라, 상위 계층 간 handoff를 명확��� 하기 위한 기준이다.

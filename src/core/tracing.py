@@ -36,7 +36,6 @@ def build_analysis_trace_config(
         ... )
         >>> chain.invoke({"papers": data}, config=config)
     """
-    # 입력값 검증
     valid_stages = {
         "translation",
         "summary",
@@ -56,17 +55,14 @@ def build_analysis_trace_config(
     if quality_score is not None and not (0.0 <= quality_score <= 1.0):
         raise ValueError(f"quality_score는 0.0~1.0 사이여야 합니다. 받은 값: {quality_score}")
     
-    # 메타데이터 구성
     merged_metadata = extra_metadata or {}
-    
-    # 평가 정보 추가 (평가 루프용)
+
     if quality_score is not None:
         merged_metadata["quality_score"] = quality_score
-    
+
     if eval_tags:
         merged_metadata["eval_tags"] = eval_tags
-    
-    # 기본 태그 설정 (stage별로 구분)
+
     base_tags = ["llm", "analysis", stage]
     if quality_score is not None and quality_score >= 0.8:
         base_tags.append("high_quality")
@@ -153,4 +149,3 @@ def build_rag_answer_trace_config(
         user=user,
         quality_score=quality_score,
     )
-

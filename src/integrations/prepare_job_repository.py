@@ -8,7 +8,7 @@ from typing import Any
 import psycopg2
 from psycopg2.extras import Json
 
-from src.shared import AppSettings, get_settings, resolve_host_and_port
+from src.shared import AppSettings, build_postgres_connection_params, get_settings
 
 
 class PrepareJobRepository:
@@ -291,23 +291,4 @@ class PrepareJobRepository:
             )
 
     def _build_postgres_connection_params(self) -> dict[str, Any]:
-        host = self.settings.postgres_host
-        db_name = self.settings.app_postgres_db or self.settings.postgres_db
-        user = self.settings.postgres_user
-        password = self.settings.postgres_password
-
-        if not host:
-            raise ValueError("POSTGRES_HOST가 설정되지 않았습니다.")
-        if not db_name:
-            raise ValueError("APP_POSTGRES_DB 또는 POSTGRES_DB가 설정되지 않았습니다.")
-        if not user or not password:
-            raise ValueError("POSTGRES_USER 또는 POSTGRES_PASSWORD가 설정되지 않았습니다.")
-
-        resolved_host, resolved_port = resolve_host_and_port(host, self.settings.server_postgres_port)
-        return {
-            "dbname": db_name,
-            "user": user,
-            "password": password,
-            "host": resolved_host,
-            "port": resolved_port,
-        }
+        return build_postgres_connection_params(self.settings)

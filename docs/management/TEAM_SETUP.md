@@ -105,11 +105,14 @@ docker compose -p arxplore_dev -f docker-compose.dev.yml ps
 기본 컨테이너:
 
 - `arxplore-dev`
+- `arxplore-django`
+- `arxplore-frontend`
 
 기본 접속:
 
+- Frontend: `http://127.0.0.1:5173`
 - Jupyter: `http://127.0.0.1:18888`
-- Streamlit: `http://127.0.0.1:18501`
+- Django: `http://127.0.0.1:18001`
 
 dev 컨테이너 접속:
 
@@ -122,14 +125,9 @@ docker compose -p arxplore_dev -f docker-compose.dev.yml exec dev bash
 - Python 스크립트 실행
 - notebook 실험
 - retrieval / prompt / chain 검증
-- Streamlit 실행
+- Django API 점검
+- React 프론트엔드 개발
 - 간단한 DB 점검
-
-### Streamlit 실행
-
-```bash
-streamlit run app/main.py --server.address=0.0.0.0
-```
 
 ## 8. 로컬 parser 컨테이너 실행
 

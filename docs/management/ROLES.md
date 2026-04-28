@@ -63,7 +63,7 @@ ArXplore에서는 아래 표현을 표준 용어로 사용한다.
 | **2. RAG 응답 · 근거 제어 담당** | 1명 | query 해석, context 조합, answer chain, citation 정책, answer payload |
 | **3. 한국어 번역 · 상세 요약 프롬프트 담당** | 1명 | 한국어 번역, 상세 요약 구조, prompt 규칙, 용어 일관성 |
 | **4. 논문 상세 · 프롬프트 평가 담당** | 1명 | `PaperDetailDocument` 생성 chain, overview/key_findings 프롬프트, 평가 루프 |
-| **5. UI · 문서 소비 계층 담당** | 1명 | Streamlit 논문 목록, 논문 상세, 검색, 상태 처리 |
+| **5. UI · 문서 소비 계층 담당** | 1명 | React 논문 목록, 논문 상세, 검색, 상태 처리 |
 
 이 구조에서 역할 1과 2는 모두 RAG 계열이지만 책임을 분리한다. 역할 1은 "무엇을 가져올 것인가"를, 역할 2는 "가져온 것으로 어떻게 답할 것인가"를 책임진다. 역할 3과 4는 모두 프롬프트 계열이지만, 역할 3은 단일 논문 또는 chunk 기반의 한국어 산출물에, 역할 4는 논문 상세 문서 구조화에 집중한다. 역할 5는 이 결과를 읽는 소비 계층으로 유지한다.
 
@@ -224,8 +224,10 @@ answer payload는 최소한 아래 정보를 포함해야 한다.
 
 #### 소유 모듈
 
-- `app/main.py`
-- `app/paper_detail_demo.py`
+- `frontend/src/pages/list/`
+- `frontend/src/pages/detail/`
+- `frontend/src/pages/assistant/`
+- `web/papers/api_views.py`
 
 #### 책임 범위
 

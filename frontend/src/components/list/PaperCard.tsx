@@ -1,0 +1,128 @@
+import type { MouseEvent } from "react";
+import type { PaperListItem } from "../../pages/list/listTypes";
+
+function truncateText(text: string | undefined, max: number): string {
+  if (!text) {
+    return "";
+  }
+  return text.length > max ? `${text.slice(0, max)}...` : text;
+}
+
+function getPublishedDate(value: string | null | undefined): string {
+  if (!value) {
+    return "";
+  }
+  return value.slice(0, 10);
+}
+
+interface PaperCardProps {
+  paper: PaperListItem;
+  canOpenDetail: boolean;
+  canFavorite: boolean;
+  onToggleFavorite: (arxivId: string) => void;
+  onRequireLogin: () => void;
+}
+
+export function PaperCard({
+  paper,
+  canOpenDetail,
+  canFavorite,
+  onToggleFavorite,
+  onRequireLogin,
+}: PaperCardProps) {
+  const detailLink = `/papers/${paper.arxiv_id}/`;
+  const pdfLink = paper.pdf_url || `https://arxiv.org/abs/${paper.arxiv_id}`;
+
+  const handleTitleClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.stopPropagation();
+  };
+
+  const handleFavoriteClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!canFavorite) {
+      onRequireLogin();
+      return;
+    }
+    onToggleFavorite(paper.arxiv_id);
+  };
+
+  const handleCardClick = () => {
+    if (!canOpenDetail) {
+      window.location.href = `/login/?next=${encodeURIComponent(detailLink)}`;
+      return;
+    }
+    window.location.href = detailLink;
+  };
+
+  return (
+    <article className="paper-card" onClick={handleCardClick}>
+      <div className="paper-card-top">
+        <div className="paper-title">
+          <a href={pdfLink} target="_blank" rel="noreferrer" onClick={handleTitleClick}>
+            {truncateText(paper.title, 65)}
+          </a>
+        </div>
+        <button
+          type="button"
+          className={`paper-favorite-btn ${paper.is_favorited ? "active" : ""}`}
+          onClick={handleFavoriteClick}
+          aria-label={paper.is_favorited ? "즐겨찾기 해제" : "즐겨찾기 추가"}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill={paper.is_favorited ? "currentColor" : "none"}
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z" />
+          </svg>
+        </button>
+      </div>
+      <div className="paper-abstract">{truncateText(paper.abstract, 200)}</div>
+      <div className="paper-meta paper-meta-row">
+        <div className="paper-meta-item">
+          <svg
+            className="paper-meta-icon-muted"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+          <span>{getPublishedDate(paper.published_at)}</span>
+        </div>
+        <div className="paper-meta-item">
+          <svg
+            className="paper-meta-icon-heart"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+          </svg>
+          <span>{paper.upvotes ?? 0}</span>
+        </div>
+      </div>
+    </article>
+  );
+}
