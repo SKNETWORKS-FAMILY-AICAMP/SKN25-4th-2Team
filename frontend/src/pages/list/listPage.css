@@ -187,6 +187,7 @@
   height: 280px;
   cursor: pointer;
   transition: box-shadow 0.2s, border-color 0.2s;
+  position: relative;
 }
 
 .list-page .paper-card-top {
@@ -243,6 +244,55 @@
   text-decoration: underline;
 }
 
+.list-page .paper-card::before {
+  content: "논문원본 바로가기";
+  position: absolute;
+  top: -5px;
+  left: 12px;
+  background: rgba(30, 30, 30, 0.82);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.list-page .paper-card:has(.paper-title a:hover)::before {
+  opacity: 1;
+}
+
+.list-page .paper-abstract-wrapper {
+  position: relative;
+  flex: 1;
+  margin-bottom: 10px;
+}
+
+.list-page .paper-abstract-wrapper::after {
+  content: "ArXplore로 분석하기";
+  position: absolute;
+  inset: 0;
+  background: rgba(50, 50, 55, 0.78);
+  color: #fff;
+  font-size: 1.05rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+
+.list-page .paper-abstract-wrapper:hover::after {
+  opacity: 1;
+}
+
 .list-page .paper-abstract {
   font-size: 0.83rem;
   color: #555;
@@ -251,8 +301,6 @@
   display: -webkit-box;
   -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
-  flex: 1;
-  margin-bottom: 10px;
 }
 
 .list-page .paper-meta {

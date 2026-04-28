@@ -24,6 +24,7 @@ export default defineConfig(({ command }) => ({
       "/favorites/": proxy(djangoTarget),
       "/papers/list.json": proxy(djangoTarget),
       "/papers/assistant/chat/": proxy(djangoTarget),
+      "/papers/assistant/stream/": proxy(djangoTarget),
       "^/papers/[^/]+/detail\\.json$": proxy(djangoTarget),
       "^/papers/[^/]+/analyze/$": proxy(djangoTarget),
       "^/papers/[^/]+/summary/$": proxy(djangoTarget),

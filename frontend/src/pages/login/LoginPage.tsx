@@ -75,7 +75,6 @@ export function LoginPage({ onAuthSuccess }: LoginPageProps) {
       <div className="login-card">
         <div className="login-card-header">
           <h1>{mode === "login" ? "로그인" : "회원가입"}</h1>
-          <p>즐겨찾기와 AI 기능을 사용하려면 로그인하세요.</p>
         </div>
 
         <div className="login-mode-tabs">

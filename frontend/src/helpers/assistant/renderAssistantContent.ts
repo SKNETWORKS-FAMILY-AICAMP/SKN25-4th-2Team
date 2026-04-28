@@ -35,7 +35,7 @@ function renderInlineMarkdown(text: string): string {
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_, label, url) => {
     const internalHref = toInternalPaperHref(url);
     if (internalHref) {
-      return `<a href="${internalHref}">${label}</a>`;
+      return `<a href="${internalHref}" target="_blank" rel="noopener noreferrer">${label}</a>`;
     }
 
     return `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`;

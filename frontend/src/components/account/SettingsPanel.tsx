@@ -4,7 +4,6 @@ import {
   clearPersonalApiKey,
   fetchFavorites,
   savePersonalApiKey,
-  saveSettings,
 } from "../../helpers/accountApi";
 import type { BootstrapPayload, FavoriteListPayload } from "../../types/app";
 
@@ -30,7 +29,7 @@ export function SettingsPanel({
 }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [apiKeyInput, setApiKeyInput] = useState("");
-  const [selectedModel, setSelectedModel] = useState(session.preferred_summary_model);
+
   const [statusMessage, setStatusMessage] = useState("");
   const [favorites, setFavorites] = useState<FavoriteListPayload["items"]>([]);
   const [favoritesError, setFavoritesError] = useState("");
@@ -41,9 +40,8 @@ export function SettingsPanel({
       return;
     }
     setActiveTab(initialTab);
-    setSelectedModel(session.preferred_summary_model);
     setStatusMessage("");
-  }, [initialTab, open, session.preferred_summary_model]);
+  }, [initialTab, open]);
 
   useEffect(() => {
     if (!open || activeTab !== "favorites" || !session.is_authenticated) {
@@ -79,22 +77,6 @@ export function SettingsPanel({
   if (!open) {
     return null;
   }
-
-  const handleSaveSettings = async () => {
-    setIsBusy(true);
-    setStatusMessage("");
-    try {
-      const payload = await saveSettings(selectedModel);
-      if (payload.error) {
-        setStatusMessage(payload.error);
-        return;
-      }
-      await onSessionChanged();
-      setStatusMessage("설정을 저장했습니다.");
-    } finally {
-      setIsBusy(false);
-    }
-  };
 
   const handleSaveApiKey = async () => {
     setIsBusy(true);
@@ -181,22 +163,6 @@ export function SettingsPanel({
                 <span className={session.has_personal_api_key ? "status-chip active" : "status-chip"}>
                   {session.has_personal_api_key ? "등록됨" : "미등록"}
                 </span>
-              </div>
-            </section>
-
-            <section className="settings-section">
-              <h3>기본 상세요약 모델</h3>
-              <div className="settings-field-row">
-                <select value={selectedModel} onChange={(event) => setSelectedModel(event.target.value)}>
-                  {session.available_summary_models.map((model) => (
-                    <option key={model} value={model}>
-                      {model}
-                    </option>
-                  ))}
-                </select>
-                <button type="button" onClick={() => void handleSaveSettings()} disabled={isBusy}>
-                  저장
-                </button>
               </div>
             </section>
 

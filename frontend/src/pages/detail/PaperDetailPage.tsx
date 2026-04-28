@@ -186,7 +186,7 @@ export function PaperDetailPage({
 
   const summaryButtonLabel = useMemo(() => {
     if (!session.has_personal_api_key) {
-      return "API 키 등록 후 상세요약 생성";
+      return "API 키 등록하기";
     }
     if (summaryBlocks.length > 0) {
       return "다른 모델로 상세요약";
@@ -254,6 +254,16 @@ export function PaperDetailPage({
       <div className="detail-page">
         <div className="page-error-wrap">
           <div className="error-box">{pageError}</div>
+          {arxivId ? (
+            <a
+              href={`https://arxiv.org/abs/${arxivId}`}
+              target="_blank"
+              rel="noreferrer"
+              className="arxiv-fallback-btn"
+            >
+              arXiv에서 보기 ↗
+            </a>
+          ) : null}
         </div>
       </div>
     );
@@ -300,7 +310,7 @@ export function PaperDetailPage({
             <select value={selectedSummaryModel} onChange={(event) => setSelectedSummaryModel(event.target.value)}>
               {session.available_summary_models.map((model) => (
                 <option key={model} value={model}>
-                  {model}
+                  {model.replace(/-/g, " ").toUpperCase()}
                 </option>
               ))}
             </select>

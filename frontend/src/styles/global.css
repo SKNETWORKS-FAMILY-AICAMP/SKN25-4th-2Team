@@ -318,18 +318,27 @@ a {
   width: min(100%, 360px);
   background: #fff;
   border-radius: 18px;
-  padding: 20px;
+  padding: 28px 24px;
   border: 1px solid #e2e7ee;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
 }
 
 .summary-model-dialog h2 {
-  margin: 0 0 14px;
+  margin: 0;
   font-size: 1.2rem;
+}
+
+.summary-model-dialog select {
+  width: 100%;
 }
 
 .summary-model-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 10px;
-  margin-top: 16px;
+  width: 100%;
 }

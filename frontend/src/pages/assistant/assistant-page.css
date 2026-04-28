@@ -142,7 +142,13 @@
   border-radius: 999px;
   background: #2f343b;
   color: #fff;
-  padding: 0 18px;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   font-size: 0.92rem;
   font-weight: 700;
   cursor: pointer;
@@ -153,25 +159,56 @@
   cursor: not-allowed;
 }
 
+.assistant-composer .assistant-stop-btn {
+  background: #dc2626;
+  min-width: 60px;
+}
+
+.assistant-composer .assistant-stop-btn:hover {
+  background: #b91c1c;
+}
+
 .assistant-notice {
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
-  color: #4b5563;
-  border-radius: 14px;
-  padding: 16px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 20px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+  padding: 24px;
   margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
 }
 
 .assistant-notice p {
   margin: 0;
+  color: #4b5563;
+  font-size: 0.95rem;
 }
 
 .assistant-notice-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 12px;
   flex-wrap: wrap;
+  justify-content: center;
+}
+
+.assistant-notice-actions button {
+  border: none;
+  border-radius: 999px;
+  background: #2f343b;
+  color: #fff;
+  padding: 10px 20px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.assistant-notice-actions button:hover {
+  background: #1a1e24;
 }
 
 .assistant-notice-actions a {

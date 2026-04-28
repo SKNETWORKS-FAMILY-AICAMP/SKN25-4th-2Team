@@ -37,7 +37,6 @@ function AssistantRoute({
     <AssistantPage
       session={session}
       initialQuery={searchParams.get("q") ?? ""}
-      assistantChatEndpoint="/papers/assistant/chat/"
       homeHref="/"
       onRequireLogin={() => navigate(`/login/?next=${encodeURIComponent("/papers/assistant/")}`)}
       onOpenSettings={() => onOpenSettings("settings")}

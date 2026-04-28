@@ -26,10 +26,10 @@ export function AssistantNotice({
           </button>
         ) : (
           <button type="button" onClick={onRequireLogin}>
-            로그인하기
+            로그인
           </button>
         )}
-        <a href={homeHref}>목록으로 돌아가기</a>
+        <a href={homeHref}>뒤로가기</a>
       </div>
     </div>
   );

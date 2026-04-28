@@ -378,6 +378,29 @@ def answer_agent_chat(
     return result.get("answer") or "답변을 생성할 수 없습니다."
 
 
+def stream_agent_chat(
+    user_message: str,
+    chat_history: list[dict[str, Any]],
+    *,
+    user: AbstractBaseUser | AnonymousUser,
+    session_api_key: str | None,
+):
+    _require_authenticated_user(user)
+    api_key = _require_personal_api_key(session_api_key)
+    cleaned_message = user_message.strip()
+    if not cleaned_message:
+        raise ValueError("메시지를 입력하세요.")
+
+    from src.core.agent.chatbot import stream_agent_search
+
+    with override_openai_runtime(api_key=api_key):
+        yield from stream_agent_search(
+            cleaned_message,
+            chat_history=_build_history_tuples(chat_history),
+            user=user.get_username(),
+        )
+
+
 def _get_paper_or_raise(arxiv_id: str) -> dict[str, Any]:
     repo = get_paper_repository()
     paper = repo.get_paper(arxiv_id)
