@@ -18,15 +18,35 @@ FRONTEND_DIST_DIR = FRONTEND_DIR / "dist"
 APP_SETTINGS = get_settings()
 
 
-SECRET_KEY = 'django-insecure-6-2%pdjwz^)7-yobk0p*md+=$@(0^d4k!3z!yfm*9#g!sqspvx'
-DEBUG = True
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_csv(name: str, default: list[str]) -> list[str]:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+DEBUG = _env_bool("DJANGO_DEBUG", True)
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
+if not SECRET_KEY:
+    if not DEBUG:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG=False.")
+    SECRET_KEY = "django-insecure-dev-only-arxplore-secret-key"
 FRONTEND_PORT = os.getenv("FRONTEND_PORT", "5173")
 
-ALLOWED_HOSTS = ['*']
-CSRF_TRUSTED_ORIGINS = [
+ALLOWED_HOSTS = _env_csv("DJANGO_ALLOWED_HOSTS", ["*"] if DEBUG else ["localhost", "127.0.0.1"])
+CSRF_TRUSTED_ORIGINS = _env_csv("DJANGO_CSRF_TRUSTED_ORIGINS", [
+    "http://localhost",
+    "http://127.0.0.1",
     f'http://localhost:{FRONTEND_PORT}',
     f'http://127.0.0.1:{FRONTEND_PORT}',
-]
+])
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -99,8 +119,6 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [
-    ('frontend', FRONTEND_DIST_DIR),
-]
+STATICFILES_DIRS = [('frontend', FRONTEND_DIST_DIR)] if FRONTEND_DIST_DIR.exists() else []
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

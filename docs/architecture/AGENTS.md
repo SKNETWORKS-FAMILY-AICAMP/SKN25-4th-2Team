@@ -67,7 +67,7 @@ RAG 응답 계층이 UI에 넘기는 answer payload 역시 공용 계약이다. 
 - `src/integrations/`: 외부 서비스 연동, 저장소 접근, retrieval 구현
 - `src/core/`: 도메인 모델, 프롬프트, 생성 체인, RAG 응답
 - `src/shared/`: 설정과 tracing
-- `web/`: Django API와 React shell
+- `backend/`: Django API와 React shell
 - `frontend/`: React UI
 
 아래 변경은 구조 원칙에 어긋난다.

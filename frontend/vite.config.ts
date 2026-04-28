@@ -1,27 +1,35 @@
+/// <reference types="node" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 
 const djangoTarget = "http://arxplore-django:8001";
+const buildBasePath = process.env.VITE_BASE_PATH || "/static/frontend/";
+
+const proxy = (target: string) => ({
+  target,
+  changeOrigin: false,
+  headers: { host: "localhost" },
+});
 
 export default defineConfig(({ command }) => ({
-  base: command === "serve" ? "/" : "/static/frontend/",
+  base: command === "serve" ? "/" : buildBasePath,
   plugins: [react()],
   server: {
     host: "0.0.0.0",
     port: 5173,
     proxy: {
-      "/bootstrap.json": djangoTarget,
-      "/auth/": djangoTarget,
-      "/settings/": djangoTarget,
-      "/favorites/": djangoTarget,
-      "/papers/list.json": djangoTarget,
-      "/papers/assistant/chat/": djangoTarget,
-      "^/papers/[^/]+/detail\\.json$": djangoTarget,
-      "^/papers/[^/]+/analyze/$": djangoTarget,
-      "^/papers/[^/]+/summary/$": djangoTarget,
-      "^/papers/[^/]+/chat/$": djangoTarget,
-      "/admin/": djangoTarget,
-      "/static/": djangoTarget
+      "/bootstrap.json": proxy(djangoTarget),
+      "/auth/": proxy(djangoTarget),
+      "/settings/": proxy(djangoTarget),
+      "/favorites/": proxy(djangoTarget),
+      "/papers/list.json": proxy(djangoTarget),
+      "/papers/assistant/chat/": proxy(djangoTarget),
+      "^/papers/[^/]+/detail\\.json$": proxy(djangoTarget),
+      "^/papers/[^/]+/analyze/$": proxy(djangoTarget),
+      "^/papers/[^/]+/summary/$": proxy(djangoTarget),
+      "^/papers/[^/]+/chat/$": proxy(djangoTarget),
+      "/admin/": proxy(djangoTarget),
+      "/static/": proxy(djangoTarget),
     }
   }
 }));

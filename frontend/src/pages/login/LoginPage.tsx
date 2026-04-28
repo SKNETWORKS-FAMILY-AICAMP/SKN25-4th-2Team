@@ -63,10 +63,13 @@ export function LoginPage({ onAuthSuccess }: LoginPageProps) {
         <a href={next !== "/" ? next : "/"} className="back-btn">
           뒤로가기
         </a>
+      </div>
+      <div className="login-topbar-center">
         <a href="/" className="login-topbar-logo">
           ArXplore
         </a>
       </div>
+      <div className="login-topbar-right" />
     </div>
     <main className="login-page">
       <div className="login-card">

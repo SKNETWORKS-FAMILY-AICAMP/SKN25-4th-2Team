@@ -227,7 +227,7 @@ answer payload는 최소한 아래 정보를 포함해야 한다.
 - `frontend/src/pages/list/`
 - `frontend/src/pages/detail/`
 - `frontend/src/pages/assistant/`
-- `web/papers/api_views.py`
+- `backend/papers/api_views.py`
 
 #### 책임 범위
 

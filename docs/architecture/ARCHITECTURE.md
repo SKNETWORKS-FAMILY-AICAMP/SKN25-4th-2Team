@@ -4,7 +4,7 @@
 
 이 문서는 ArXplore의 현재 운영 구조와 모듈 경계를 코드 기준으로 설명한다. 목표 구조를 추상적으로 제시하는 것이 아니라, 이미 구현된 수집, 파싱, 적재, 임베딩 기반 위에 retrieval, answer chain, 논문 상세 문서, UI가 어떤 식으로 연결되는지를 정리하는 데 목적이 있다.
 
-현재 ArXplore는 `최신 AI 논문 수집 -> raw 저장 -> prepare queue 등록 -> 로컬 prepare/embedding -> retrieval -> 논문 상세 문서 / RAG answer -> UI` 흐름을 기준으로 한다. 이때 수집 자동화와 무거운 파싱/임베딩 실행은 같은 런타임에 있지 않다. 서버는 Airflow와 데이터 저장소를 운영하고, 로컬 개발용 PC는 parser와 prepare worker를 실행하는 역할을 맡는다.
+현재 ArXplore는 `최신 AI 논문 수집 -> raw 저장 -> prepare queue 등록 -> 로컬 prepare/embedding -> retrieval -> 논문 상세 문서 / RAG answer -> UI` 흐름을 기준으로 한다. 이때 수집 자동화와 무거운 파싱/임베딩 실행은 같은 런타임에 있지 않다. 서버 스택은 Airflow와 데이터 저장소를 운영하고, 로컬 개발용 PC는 React/Django 개발 서버, parser, prepare worker를 실행하는 역할을 맡는다.
 
 ## 2. 시스템 전경
 
@@ -62,7 +62,7 @@ flowchart TD
 
 ### 로컬 개발 런타임
 
-로컬 개발 환경은 `docker-compose.dev.yml`의 `arxplore-dev`, `arxplore-django`, `arxplore-frontend` 컨테이너를 중심으로 동작한다. 이 스택은 Python 실행, Jupyter, Django API, React 프론트엔드, 스크립트 검증, notebook 실험을 담당한다.
+최종 시연 환경은 `docker-compose.dev.yml`의 `arxplore-nginx`, `arxplore-django` 컨테이너를 중심으로 동작한다. nginx는 React build 정적 파일을 서빙하고 API 요청을 Django로 프록시하며, Django는 gunicorn으로 백엔드 API를 실행한다. 프론트엔드 수정 중에는 `arxplore-vite` 컨테이너를 추가로 실행해 Vite dev server로 화면을 확인한다.
 
 ### 로컬 parser 런타임
 
@@ -160,9 +160,9 @@ Airflow가 파싱하는 DAG 정의만 둔다.
 
 Django 백엔드 계층이다.
 
-- `web/arxplore_web/`: Django 설정과 프로젝트 URL
-- `web/papers/api_views.py`: 분석, 요약, 채팅, bootstrap API
-- `web/papers/page_views.py`: React shell과 JSON endpoint
+- `backend/arxplore_web/`: Django 설정과 프로젝트 URL
+- `backend/papers/api_views.py`: 분석, 요약, 채팅, bootstrap API
+- `backend/papers/page_views.py`: React shell과 JSON endpoint
 
 ### `frontend`
 

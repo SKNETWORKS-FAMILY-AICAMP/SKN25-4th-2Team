@@ -27,7 +27,7 @@
 
 - `.env`가 최신인지
 - Docker가 실행 중인지
-- `arxplore-dev` 컨테이너가 정상인지
+- `arxplore-django`, `arxplore-nginx` 컨테이너가 정상인지
 - 필요하면 parser 컨테이너가 올라와 있���지
 - 서버 DB와 Tailscale 연결이 가능한지
 - 현재 작업이 retrieval, answer, prompt, ���문 상세, UI 중 어디에 속하는지
@@ -35,7 +35,7 @@
 상태 확인 명령:
 
 ```bash
-docker compose -p arxplore_dev -f docker-compose.dev.yml ps
+docker compose -p arxplore_demo -f docker-compose.dev.yml ps
 docker compose -p arxplore_server -f docker-compose.server.yml ps
 docker compose -f docker-compose.parser.yml ps
 ```
@@ -44,11 +44,11 @@ docker compose -f docker-compose.parser.yml ps
 
 ### 개발자 기본 모드
 
-대부분의 구현은 `arxplore-dev` 컨테이너 안에서 진행한다.
+시연 검증은 `arxplore-django`와 `arxplore-nginx` 컨테이너를 기준으로 진행한다. 프론트엔드 수정 중에는 `arxplore-vite`를 추가로 실행한다.
 
 ```bash
 bash scripts/setup-dev.sh
-docker compose -p arxplore_dev -f docker-compose.dev.yml exec dev bash
+docker compose -p arxplore_demo -f docker-compose.dev.yml ps django vite
 ```
 
 이 모드에서 수행하는 작업:

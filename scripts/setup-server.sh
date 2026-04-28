@@ -12,6 +12,10 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+docker volume inspect arxplore_server_arxplore_postgres_data >/dev/null 2>&1 || docker volume create arxplore_server_arxplore_postgres_data >/dev/null
+docker volume inspect arxplore_server_arxplore_mongo_data >/dev/null 2>&1 || docker volume create arxplore_server_arxplore_mongo_data >/dev/null
+docker volume inspect arxplore_server_arxplore_airflow_logs >/dev/null 2>&1 || docker volume create arxplore_server_arxplore_airflow_logs >/dev/null
+
 docker build -t arxplore-airflow -f docker/airflow/Dockerfile .
 docker compose -p "${PROJECT_NAME}" -f docker-compose.server.yml up -d --build
 

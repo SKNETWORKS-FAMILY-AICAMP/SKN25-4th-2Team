@@ -302,10 +302,10 @@ ArXplore는 현재 5역할 병렬 개발을 전제로 한다.
 - `bash scripts/setup-dev.sh`
 - `bash scripts/setup-server.sh`
 - `docker compose -f docker-compose.parser.yml up -d --build`
-- `python3 -m compileall src web dags`
+- `python3 -m compileall src backend dags`
 - `bash scripts/prepare-worker.sh once`
-- `docker compose -p arxplore_dev -f docker-compose.dev.yml exec -T frontend npm run build`
-- `docker compose -p arxplore_dev -f docker-compose.dev.yml exec -T django bash -lc 'cd /workspace/web && python manage.py check'`
+- `docker compose -p arxplore_demo -f docker-compose.dev.yml --profile dev exec -T vite npm run build`
+- `docker compose -p arxplore_demo -f docker-compose.dev.yml exec -T django python manage.py check`
 - Airflow DAG 목록에 `arxplore_daily_collect`, `arxplore_maintenance`가 표시되는지 확인
 - `notebooks/retrieval_inspection.ipynb`로 적재 상태와 retrieval 결과를 확인
 

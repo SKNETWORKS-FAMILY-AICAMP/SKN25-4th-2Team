@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
 
   arxplore-mongo:
-    container_name: arxplore-mongodb
+    container_name: arxplore-mongo
     image: arxplore-mongo
     build:
       context: .

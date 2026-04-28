@@ -45,6 +45,7 @@ flowchart TD
 - **Parser** HURIDOCS PDF Document Layout Analysis, pypdf
 - **LLM / RAG** LangChain, LangGraph (React Agent), LangSmith
 - **UI** React + Django
+- **Runtime** Demo: nginx + gunicorn, Frontend edit: Vite
 
 ## Data Collection & Preprocessing
 
@@ -121,42 +122,63 @@ LLM과 벡터 데이터베이스를 연결하는 RAG 구현 코드는 다음 위
 
 ## Quick Start
 
-### Dev Container
+### 실행
 
 ```bash
-bash scripts/setup-dev.sh
-docker compose -p arxplore_dev -f docker-compose.dev.yml exec dev bash
+bash scripts/setup.sh
 ```
 
-- Frontend: `http://127.0.0.1:5173`
-- Jupyter: `http://127.0.0.1:18888`
-- Django: `http://127.0.0.1:18001`
-
-### Local Parser
+| 서비스 | URL | 설명 |
+|--------|-----|------|
+| Web | `http://localhost:80` | nginx → gunicorn Django + React 빌드 |
+| Vite | `http://localhost:5173` | 프론트엔드 수정 실시간 확인 |
 
 ```bash
-docker compose -f docker-compose.parser.yml up -d --build
-docker logs -f arxplore-layout-parser
+# 내리기
+docker compose down
 ```
 
-### Prepare Worker
+### Parser + Prepare Worker (GPU 필요)
+
+PDF 파싱과 임베딩 처리가 필요할 때 `parser` 프로필로 추가 실행합니다.
 
 ```bash
-bash scripts/prepare-worker.sh         # auto mode (LISTEN/NOTIFY)
-bash scripts/prepare-worker.sh once    # 1회 실행
+docker compose --profile parser up -d --build
+```
+
+- `arxplore-layout-parser` — HURIDOCS GPU 파서 (`:5060`)
+- `arxplore-prepare-worker` — prepare queue 소비 worker (LISTEN/NOTIFY 루프)
+
+### 서버 포트 포워딩
+
+메인 서버(PostgreSQL · MongoDB · Airflow)로 SSH 터널이 필요할 때 사용합니다.
+
+```bash
+bash scripts/setup.sh forward            # 시작
+bash scripts/setup.sh forward stop       # 중지
+bash scripts/setup.sh forward status     # 상태 확인
+bash scripts/setup.sh forward restart    # 재시작
 ```
 
 ### Server Stack
+
+메인 서버 컴퓨터에서만 실행합니다.
 
 ```bash
 bash scripts/setup-server.sh
 docker compose -p arxplore_server -f docker-compose.server.yml ps
 ```
 
+- Airflow: `http://127.0.0.1:18080`
+- MongoDB: `localhost:17017`
+- PostgreSQL: `localhost:15432`
+
 운영 중인 Airflow DAG:
 
 - `arxplore_daily_collect` — KST 18:00, HF Daily Papers 수집 후 `prepare_jobs` enqueue
 - `arxplore_maintenance` — 3시간마다 raw backfill → arXiv 메타데이터 enrichment
+
+시연 실행 전 `.env`에는 `DJANGO_SECRET_KEY`와 `PROD_POSTGRES_HOST`를 실제 값으로 설정해야 합니다. 80번 포트가 이미 사용 중이면 `PROD_HTTP_PORT=18000`처럼 포트를 바꿔 실행합니다.
 
 ## Project Structure
 
@@ -171,7 +193,7 @@ src/core/               도메인 모델, 프롬프트, chains, RAG, agent
 src/integrations/       외부 연동, 저장소, parser, retrieval 구현
 src/pipeline/           파이프라인 진입점과 prepare-worker
 src/shared/             공통 설정과 tracing
-web/                    Django API + React shell
+backend/                Django API + React shell
 ```
 
 ## Documents
@@ -182,6 +204,9 @@ web/                    Django API + React shell
 - [Workflow](./docs/management/WORKFLOW.md)
 - [Roles](./docs/management/ROLES.md)
 - [Team Setup](./docs/management/TEAM_SETUP.md)
+- [Screen Design](./docs/design/SCREEN_DESIGN.md)
+- [User Flow](./docs/design/USER_FLOW.md)
+- [Slides](./docs/presentation/SLIDES.md)
 
 ## License
 

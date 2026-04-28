@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 
 
-WEB_ROOT = Path(__file__).resolve().parent.parent
-PROJECT_ROOT = WEB_ROOT.parent
+BACKEND_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BACKEND_ROOT.parent
 
 
 def configure_environment() -> None:

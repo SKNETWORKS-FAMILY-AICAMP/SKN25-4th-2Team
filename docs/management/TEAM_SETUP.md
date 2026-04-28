@@ -72,7 +72,7 @@ cd ArXplore
 환경 변수 변경을 반영해야 할 때는 컨테이너를 재생성하는 편이 안전하다.
 
 ```bash
-docker compose -p arxplore_dev -f docker-compose.dev.yml up -d --force-recreate dev
+docker compose -p arxplore_demo -f docker-compose.dev.yml up -d --force-recreate django nginx
 ```
 
 현재 구조에서 중요한 값은 다음과 같다.
@@ -95,36 +95,30 @@ docker compose -p arxplore_dev -f docker-compose.dev.yml up -d --force-recreate 
 |------|------|
 | `LANGSMITH_TRACE_USER` | 개인 trace 식별자 |
 
-## 7. dev 컨테이너 실행
+## 7. 시연/수정 컨테이너 실행
 
 ```bash
 bash scripts/setup-dev.sh
-docker compose -p arxplore_dev -f docker-compose.dev.yml ps
+docker compose -p arxplore_demo -f docker-compose.dev.yml ps
 ```
 
 기본 컨테이너:
 
-- `arxplore-dev`
 - `arxplore-django`
-- `arxplore-frontend`
+- `arxplore-nginx`
 
 기본 접속:
 
-- Frontend: `http://127.0.0.1:5173`
-- Jupyter: `http://127.0.0.1:18888`
-- Django: `http://127.0.0.1:18001`
+- Web: `http://127.0.0.1`
 
-dev 컨테이너 접속:
+프론트엔드 수정 중에는 Vite를 추가로 실행한다.
 
 ```bash
-docker compose -p arxplore_dev -f docker-compose.dev.yml exec dev bash
+bash scripts/setup-dev.sh vite
 ```
 
 이 환경에서 할 수 있는 작업:
 
-- Python 스크립트 실행
-- notebook 실험
-- retrieval / prompt / chain 검증
 - Django API 점검
 - React 프론트엔드 개발
 - 간단한 DB 점검
@@ -147,7 +141,7 @@ parser 컨테이너 원칙:
 
 ## 9. prepare-worker 실행
 
-현재 공식 prepare 진입점은 `scripts/prepare-worker.sh`다. 이 스크립트는 WSL 또는 로컬 쉘에서 실행하지만, 실제 Python worker는 `arxplore-dev` 컨테이너 안에서 동작한다.
+현재 공식 prepare 진입점은 `scripts/prepare-worker.sh`다. 이 스크립트는 WSL 또는 로컬 쉘에서 실행하지만, 실제 Python worker는 `arxplore-django` 컨테이너 안에서 동작한다.
 
 상시 대기 모드:
 
@@ -175,7 +169,7 @@ bash scripts/prepare-worker.sh once
 과거 raw를 다시 파싱해 적재할 때만 backfill 모드를 수동으로 사용한다.
 
 ```bash
-docker compose -p arxplore_dev -f docker-compose.dev.yml exec dev bash -lc \
+docker compose -p arxplore_demo -f docker-compose.dev.yml exec django bash -lc \
   'cd /workspace && python3 -m src.pipeline.prepare_worker --mode backfill --batch-days 3 --loop --sleep-seconds 120'
 ```
 
