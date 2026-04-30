@@ -6,12 +6,12 @@
 
 작업을 시작하기 전에 아래 문서를 먼저 읽는다.
 
-1. `docs/PLAN.md`
-2. `docs/ARCHITECTURE.md`
-3. `docs/ROLES.md`
-4. `docs/WORKFLOW.md`
+1. `README.md` (`Goals & Scope` 섹션 — 제품 목표와 도메인 범위)
+2. `docs/architecture/ARCHITECTURE.md`
+3. `docs/management/ROLES.md`
+4. `docs/management/WORKFLOW.md`
 
-환경 준비와 실행 절차가 필요할 때는 `docs/TEAM_SETUP.md`도 함께 읽는다.
+환경 준비와 실행 절차가 필요할 때는 `docs/management/TEAM_SETUP.md`도 함께 읽는다.
 
 문서와 코드가 충돌할 경우 코드를 즉시 바꾸지 않는다. 현재 운영 사실이 무엇인지 먼저 설명하고, 문서 정합화가 필요한지 또는 코드 수정이 필요한지 구분한 뒤 진행한다.
 
@@ -25,9 +25,9 @@ AI는 아래 운영 사실을 현재 기준선으로 사용한다.
 - 최신 수집분은 `daily_collect`가 수행한다
 - 과거 raw 백필과 arXiv 메타데이터 후속 보강은 `maintenance`가 수행한다
 - `prepare`와 `embed`는 서버 Airflow가 아니라 로컬 runtime에서 수행한다
-- 로컬 실행 진입점은 `scripts/prepare-worker.sh`와 `src/pipeline/prepare_worker.py`다
+- 로컬 실행 진입점은 `docker-compose.yml`의 `prepare-worker` 서비스(profile: parser)와 `src/pipeline/prepare_worker.py`다
 - prepare queue는 Mongo polling이 아니라 PostgreSQL `prepare_jobs` 테이블과 `prepare_job_repository.py`를 사용한다
-- parser runtime은 로컬 `docker-compose.parser.yml` 기반 HURIDOCS 컨테이너다
+- parser runtime은 같은 `docker-compose.yml`의 `layout-parser` 서비스(profile: parser, HURIDOCS 컨테이너)다
 - PDF 파싱 경로는 `layout -> pypdf -> abstract fallback` 순서다
 
 ## 3. 절대 임의 변경하면 안 되는 것

@@ -62,15 +62,15 @@ flowchart TD
 
 ### 로컬 개발 런타임
 
-최종 시연 환경은 `docker-compose.dev.yml`의 `arxplore-nginx`, `arxplore-django` 컨테이너를 중심으로 동작한다. nginx는 React build 정적 파일을 서빙하고 API 요청을 Django로 프록시하며, Django는 gunicorn으로 백엔드 API를 실행한다. 프론트엔드 수정 중에는 `arxplore-vite` 컨테이너를 추가로 실행해 Vite dev server로 화면을 확인한다.
+최종 시연 환경은 단일 `docker-compose.yml` 기본 서비스인 `arxplore-nginx`, `arxplore-django`, `arxplore-vite`를 중심으로 동작한다. nginx는 React build 정적 파일을 서빙하고 API 요청을 Django로 프록시하며, Django는 gunicorn으로 백엔드 API를 실행한다. `arxplore-vite`는 프론트엔드 수정 화면을 그대로 띄우는 Vite dev server이며 기본 실행에 포함된다.
 
 ### 로컬 parser 런타임
 
-PDF 파싱은 `docker-compose.parser.yml`의 HURIDOCS 기반 컨테이너를 사용한다. 이 parser는 로컬 개발용 PC의 리소스를 사용하며, `prepare_papers`는 먼저 이 layout parser를 호출하고 실패 시 `pypdf`, 최종적으로 abstract fallback을 사용한다.
+PDF 파싱은 같은 `docker-compose.yml`의 `parser` 프로필 서비스인 HURIDOCS 기반 `arxplore-layout-parser` 컨테이너를 사용한다. 이 parser는 로컬 개발용 PC의 GPU 리소스를 사용하며, `prepare_papers`는 먼저 이 layout parser를 호출하고 실패 시 `pypdf`, 최종적으로 abstract fallback을 사용한다.
 
 ### 로컬 worker 런타임
 
-`scripts/prepare-worker.sh`와 `src/pipeline/prepare_worker.py`는 로컬에서 `prepare_jobs`를 소비하는 공식 진입점이다. worker는 `LISTEN/NOTIFY`와 claim 로직을 사용해 새 job을 기다리다가, 새 작업이 생기면 `prepare -> embed`를 수행한다.
+`docker-compose.yml`의 `prepare-worker` 서비스(parser 프로필)와 `src/pipeline/prepare_worker.py`는 로컬에서 `prepare_jobs`를 소비하는 공식 진입점이다. worker는 `LISTEN/NOTIFY`와 claim 로직을 사용해 새 job을 기다리다가, 새 작업이 생기면 `prepare -> embed`를 수행한다. parser와 worker는 같은 profile에 묶여 있어 `docker compose --profile parser up -d`로 함께 올라온다.
 
 ## 4. 모듈 구조
 
@@ -97,6 +97,7 @@ flowchart TD
 
 - `paper_search.py`
   - HF Daily Papers와 arXiv 메타데이터 조회
+  - 논문 상세 페이지 관련 논문 카드의 외부 검색 소스 (arXiv 검색 API)
 - `raw_store.py`
   - MongoDB raw payload와 수집 상태 저장
 - `paper_repository.py`
@@ -161,8 +162,10 @@ Airflow가 파싱하는 DAG 정의만 둔다.
 Django 백엔드 계층이다.
 
 - `backend/arxplore_web/`: Django 설정과 프로젝트 URL
-- `backend/papers/api_views.py`: 분석, 요약, 채팅, bootstrap API
+- `backend/papers/api_views.py`: 분석, 요약, 채팅, 스트리밍, bootstrap API
 - `backend/papers/page_views.py`: React shell과 JSON endpoint
+- `backend/papers/services.py`: LLM 체인 호출, AI overview/요약 캐싱, 로컬 검색과 arXiv 외부 검색을 결합한 관련 논문 합성
+- `backend/papers/models.py`: `UserSettings`, `FavoritePaper` (AI overview/요약 캐시는 모델이 아니라 PostgreSQL 테이블에서 직접 관리)
 
 ### `frontend`
 
@@ -216,6 +219,8 @@ PostgreSQL은 관계형 정제 데이터와 운영 queue를 함께 저장한다.
 - `paper_fulltexts`
 - `paper_chunks`
 - `paper_embeddings`
+- `paper_ai_overviews`: 논문 분석(overview, key findings) 결과를 모델/논문 단위로 캐싱
+- `paper_ai_detailed_summaries`: 한국어 상세 요약 결과를 모델/논문 단위로 캐싱
 
 운영 테이블은 다음과 같다.
 
@@ -261,7 +266,7 @@ PostgreSQL은 관계형 정제 데이터와 운영 queue를 함께 저장한다.
   - `get_trending_papers_tool`: 최신/인기 논문 DB 통계를 조회한다.
 - **조건부 엣지 (Conditional Edges)**: 도구가 여러 번 필요하면 에이전트와 도구를 왔다 갔다 하며 다단계 의사결정을 수행한다(React 기반).
 
-이 모든 응답 과정은 `stream_mode="messages"`를 활용하여 실시간 타이핑(스트리밍) 형태로 프론트엔드로 전달된다.
+이 모든 응답 과정은 `stream_mode="messages"`를 활용하여 실시간 타이핑(스트리밍) 형태로 프론트엔드로 전달된다. Django는 `/papers/assistant/stream/` 엔드포인트(`paper_agent_stream`)에서 LangGraph stream을 `StreamingHttpResponse` + `text/event-stream`으로 그대로 프록시하며, React UI는 fetch ReadableStream으로 이를 소비하고 사용자 측 중지 버튼을 제공한다.
 
 ## 9. `PaperDetailDocument` 계약
 
@@ -290,7 +295,7 @@ class PaperDetailDocument(BaseModel):
 
 `PaperDetailDocument`는 생성 체인의 출력이자 UI 소비 계층의 입력이다. 필드 변경은 시스템 전반 변경으로 취급한다.
 
-## 9. 추적과 점검
+## 10. 추적과 점검
 
 LangSmith는 단계별 trace를 남기는 데 사용한다. 현재 기준 핵심 stage는 다음과 같다.
 
@@ -312,7 +317,7 @@ LangSmith는 단계별 trace를 남기는 데 사용한다. 현재 기준 핵심
 - `notebooks/retrieval_inspection.ipynb`
   - 적재 상태, queue 상태, retrieval 결과를 직접 확인하는 notebook
 
-## 10. 구현된 아키텍처 요약
+## 11. 구현된 아키텍처 요약
 
 현재 아키텍처를 구성하는 핵심 컴포넌트는 다음과 같다.
 

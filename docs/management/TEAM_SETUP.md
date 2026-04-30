@@ -11,10 +11,9 @@
 2. Tailscale 연결
 3. 저장소 clone
 4. .env 배치
-5. dev 컨테이너 실행
-6. parser 컨테이너 실행
-7. prepare-worker 실행
-8. 필요 시 서버 Airflow와 DB 접근을 위한 포트 포워딩
+5. 기본 컨테이너 실행 (django + nginx + vite)
+6. parser 프로필 실행 (layout-parser + prepare-worker가 함께 올라옴)
+7. 필요 시 서버 Airflow와 DB 접근을 위한 포트 포워딩
 ```
 
 ## 3. 준비 사항
@@ -39,7 +38,7 @@ docker compose version
 
 ```bash
 curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up --auth-key=<전달받은 Auth Key>
+sudo tailscale up --auth-key=tskey-auth-x2N3j4V6jDqyX0T3dG4J75X1-z1QzFzS5J
 tailscale status
 ```
 
@@ -72,7 +71,7 @@ cd ArXplore
 환경 변수 변경을 반영해야 할 때는 컨테이너를 재생성하는 편이 안전하다.
 
 ```bash
-docker compose -p arxplore_demo -f docker-compose.dev.yml up -d --force-recreate django nginx
+docker compose up -d --force-recreate django nginx
 ```
 
 현재 구조에서 중요한 값은 다음과 같다.
@@ -98,24 +97,22 @@ docker compose -p arxplore_demo -f docker-compose.dev.yml up -d --force-recreate
 ## 7. 시연/수정 컨테이너 실행
 
 ```bash
-bash scripts/setup-dev.sh
-docker compose -p arxplore_demo -f docker-compose.dev.yml ps
+bash scripts/setup.sh
+docker compose ps
 ```
 
 기본 컨테이너:
 
 - `arxplore-django`
 - `arxplore-nginx`
+- `arxplore-vite`
 
 기본 접속:
 
 - Web: `http://127.0.0.1`
+- Vite (프론트엔드 수정 실시간 확인): `http://127.0.0.1:5173`
 
-프론트엔드 수정 중에는 Vite를 추가로 실행한다.
-
-```bash
-bash scripts/setup-dev.sh vite
-```
+`arxplore-vite`는 단일 `docker-compose.yml`의 기본 서비스로 묶여 있어 `setup.sh` 한 번에 함께 올라온다. 프론트엔드 수정만 하는 경우에도 별도 명령은 필요 없다.
 
 이 환경에서 할 수 있는 작업:
 
@@ -123,13 +120,14 @@ bash scripts/setup-dev.sh vite
 - React 프론트엔드 개발
 - 간단한 DB 점검
 
-## 8. 로컬 parser 컨테이너 실행
+## 8. 로컬 parser 및 prepare-worker 실행
 
-PDF 파싱 품질 검증과 실제 prepare는 HURIDOCS 기반 parser 컨테이너를 함께 쓰는 것을 기준으로 한다.
+PDF 파싱 품질 검증과 실제 prepare는 HURIDOCS 기반 parser 컨테이너와 prepare-worker를 함께 쓰는 것을 기준으로 한다. 둘은 같은 `parser` 프로필에 묶여 있어 한 번에 올라온다.
 
 ```bash
-docker compose -f docker-compose.parser.yml up -d --build
+docker compose --profile parser up -d --build
 docker logs -f arxplore-layout-parser
+docker logs -f arxplore-prepare-worker
 ```
 
 parser 컨테이너 원칙:
@@ -139,23 +137,7 @@ parser 컨테이너 원칙:
 - 가능하면 GPU를 사용하고, 없으면 CPU fallback을 허용한다
 - parser가 없어도 `pypdf` fallback은 동작하지만 품질 기준은 parser 실행 상태를 기본으로 본다
 
-## 9. prepare-worker 실행
-
-현재 공식 prepare 진입점은 `scripts/prepare-worker.sh`다. 이 스크립트는 WSL 또는 로컬 쉘에서 실행하지만, 실제 Python worker는 `arxplore-django` 컨테이너 안에서 동작한다.
-
-상시 대기 모드:
-
-```bash
-bash scripts/prepare-worker.sh
-```
-
-1회 실행 모드:
-
-```bash
-bash scripts/prepare-worker.sh once
-```
-
-동작 방식:
+prepare-worker 동작 방식:
 
 - `arxplore_daily_collect`가 `prepare_jobs`에 날짜를 넣는다
 - `prepare-worker`가 새 job을 기다린다
@@ -164,28 +146,33 @@ bash scripts/prepare-worker.sh once
 
 `prepare-worker`는 auto 모드에서 `LISTEN/NOTIFY`로 대기하며, 새 작업이 없을 때는 polling보다 가벼운 형태로 쉬고 있다가 job이 생기면 거의 즉시 반응한다.
 
-### backfill prepare가 필요할 때
+### 1회 실행 또는 backfill이 필요할 때
 
-과거 raw를 다시 파싱해 적재할 때만 backfill 모드를 수동으로 사용한다.
+상시 worker가 떠 있는 동안에도 점검/백필 목적으로 같은 컨테이너 안에서 직접 호출할 수 있다.
 
 ```bash
-docker compose -p arxplore_demo -f docker-compose.dev.yml exec django bash -lc \
-  'cd /workspace && python3 -m src.pipeline.prepare_worker --mode backfill --batch-days 3 --loop --sleep-seconds 120'
+# 1회 실행 점검
+docker compose --profile parser exec prepare-worker \
+  python3 -m src.pipeline.prepare_worker --mode auto --max-jobs-per-run 1
+
+# 과거 raw 백필
+docker compose --profile parser exec prepare-worker \
+  python3 -m src.pipeline.prepare_worker --mode backfill --batch-days 3 --loop --sleep-seconds 120
 ```
 
-## 10. 서버 스택 실행
+## 9. 서버 스택 실행
 
 서버 스택은 수집 자동화와 DB 운영을 담당한다.
 
 ```bash
 bash scripts/setup-server.sh
-docker compose -p arxplore_server -f docker-compose.server.yml ps
+docker compose -f docker-compose.server.yml ps
 ```
 
 핵심 컨테이너:
 
 - `arxplore-postgres`
-- `arxplore-mongodb`
+- `arxplore-mongo`
 - `arxplore-airflow-init`
 - `arxplore-airflow-web`
 - `arxplore-airflow-scheduler`
@@ -196,7 +183,7 @@ docker compose -p arxplore_server -f docker-compose.server.yml ps
 - `arxplore_daily_collect`
 - `arxplore_maintenance`
 
-## 11. Airflow 운영 기준
+## 10. Airflow 운영 기준
 
 현재 운영 모델은 다음과 같다.
 
@@ -212,7 +199,7 @@ docker compose -p arxplore_server -f docker-compose.server.yml ps
 
 즉 서버 Airflow만 켜 둔다고 prepare와 embed가 자동으로 실행되는 구조가 아니다. 로컬 worker도 함께 떠 있어야 최신 수집분이 실제 `paper_fulltexts`, `paper_chunks`, `paper_embeddings`까지 이어진다.
 
-## 12. 적재 상태 점검
+## 11. 적재 상태 점검
 
 적재 상태와 retrieval 결과는 아래 notebook으로 확인한다.
 
@@ -232,9 +219,9 @@ docker compose -p arxplore_server -f docker-compose.server.yml ps
 3. `prepare-worker`가 이를 소비하는지
 4. embedding backlog가 남아 있지 않은지
 
-## 13. Windows 브라우저에서 서버 접근
+## 12. Windows 브라우저에서 서버 접근
 
-WSL에만 Tailscale이 설치되어 있으면 Windows 브라우저에서 Airflow와 DB를 직접 보기 어렵다. 이 경우 `scripts/port-forward.sh`로 포트 포워딩을 사용한다.
+WSL에만 Tailscale이 설치되어 있으면 Windows 브라우저에서 Airflow와 DB를 직접 보기 어렵다. 이 경우 `scripts/setup.sh`의 `forward` 서브커맨드로 포트 포워딩을 사용한다.
 
 사전 준비:
 
@@ -246,15 +233,15 @@ sudo service ssh start
 그 다음 실행:
 
 ```bash
-bash scripts/port-forward.sh
+bash scripts/setup.sh forward
 ```
 
 제어 명령:
 
 ```bash
-bash scripts/port-forward.sh status
-bash scripts/port-forward.sh stop
-bash scripts/port-forward.sh restart
+bash scripts/setup.sh forward status
+bash scripts/setup.sh forward stop
+bash scripts/setup.sh forward restart
 ```
 
 포워딩 주소:
@@ -265,7 +252,7 @@ bash scripts/port-forward.sh restart
 | PostgreSQL | `127.0.0.1:15432` |
 | MongoDB | `127.0.0.1:17017` |
 
-## 14. 접속 정보 요약
+## 13. 접속 정보 요약
 
 ### dev 컨테이너 / 코드 기준
 
@@ -284,7 +271,7 @@ bash scripts/port-forward.sh restart
 | PostgreSQL | `127.0.0.1:15432` |
 | MongoDB | `127.0.0.1:17017` |
 
-## 15. LangSmith 설정
+## 14. LangSmith 설정
 
 LangSmith는 별도 컨테이너 없이 Python 실행 환경에서 사용한다. 공용 프로젝트 이름은 유지하고, 각자 `LANGSMITH_TRACE_USER`만 개인 식별자로 맞춘다.
 
