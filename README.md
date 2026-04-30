@@ -2,6 +2,10 @@
 
 ArXplore는 Hugging Face Daily Papers와 arXiv를 기반으로 최신 AI 논문을 수집하고, 이를 구조화된 논문 상세 문서와 LangGraph 기반 Agentic RAG로 재구성해 탐색할 수 있게 만드는 AI 논문 탐색 플랫폼입니다. 현재 시스템은 `서버 수집 자동화 + 로컬 prepare/embedding worker + PostgreSQL/pgvector 검색 계층 + LangGraph React Agent` 위에서 운영됩니다.
 
+<img width="1901" height="939" alt="스크린샷 2026-04-30 110346" src="https://github.com/user-attachments/assets/e484d29b-379b-4efb-9b8e-0c9f397b7c16" />
+<img width="1900" height="915" alt="스크린샷 2026-04-30 110304" src="https://github.com/user-attachments/assets/97fee07e-b0ea-407a-b3cc-37d751cb42f0" />
+
+
 ## Goals & Scope
 
 ArXplore는 최신 AI 논문을 수집하고, 구조화된 논문 상세 문서와 RAG 기반 질의응답으로 재구성해 사용자가 더 빠르게 이해할 수 있도록 돕는 플랫폼입니다. `검색`, `논문 상세 탐색`, `한국어 요약`, `근거 기반 응답`을 한 제품 흐름으로 묶는 것을 목표로 합니다.
